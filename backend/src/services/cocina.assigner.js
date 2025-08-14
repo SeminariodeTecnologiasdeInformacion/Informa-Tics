@@ -23,12 +23,58 @@ async function promoteNextForChef(chefId) {
   });
 }
 
-// Reparte PLATILLOS PENDIENTES (más antiguos) entre chefs activos (o todos los cocineros habilitados como fallback)
-// y luego garantiza que cada chef tenga 1 en PREPARANDO (si tiene cola).
+// 👉 Nuevo: reasignar un ítem rechazado a OTRO chef (no al que lo rechazó)
+async function reassignItemToAnotherChef(itemId, excludeChefId) {
+  // Asegúrate que sigue libre y aplica a PLATILLO
+  const item = await prisma.ordenItem.findUnique({ where: { id: itemId } });
+  if (!item || item.estado !== "PENDIENTE" || item.chefId !== null || item.tipo !== "PLATILLO") {
+    return false; // ya lo tomó alguien o no aplica
+  }
+
+  // Chefs activos (excluyendo al que rechazó); si no hay, fallback a cocineros habilitados
+  let chefIds = (await prisma.cocinaChef.findMany({ where: { activo: true } }))
+    .map(c => c.chefId)
+    .filter(id => id !== excludeChefId);
+
+  if (!chefIds.length) {
+    const cocineros = await prisma.usuario.findMany({
+      where: { rol: { nombre: "COCINERO" }, estado: true, NOT: { id: excludeChefId } },
+      select: { id: true }
+    });
+    chefIds = cocineros.map(c => c.id);
+  }
+  if (!chefIds.length) return false;
+
+  // Ordena por menor carga (ASIGNADO|PREPARANDO)
+  const cargas = await Promise.all(
+    chefIds.map(async id => ({
+      id,
+      abiertos: await prisma.ordenItem.count({
+        where: { chefId: id, estado: { in: ["ASIGNADO", "PREPARANDO"] } }
+      })
+    }))
+  );
+  cargas.sort((a, b) => a.abiertos - b.abiertos);
+
+  const candidato = cargas.find(c => c.abiertos < CAPACIDAD_POR_CHEF);
+  if (!candidato) return false;
+
+  await prisma.ordenItem.update({
+    where: { id: itemId },
+    data: { chefId: candidato.id, estado: "ASIGNADO", asignadoEn: new Date() }
+  });
+
+  // Si ese chef no prepara nada, arranca el primero automáticamente
+  await promoteNextForChef(candidato.id);
+  return true;
+}
+
+// Reparte PENDIENTES (PLATILLO) priorizando antiguos y balanceando por carga.
+// Luego garantiza 1 en PREPARANDO por chef si tiene cola.
 async function rebalanceAssignments() {
   console.log("[REB] start");
 
-  // 1) Chefs activos; si no hay, usar todos los cocineros habilitados (fallback)
+  // 1) Chefs activos o fallback a cocineros habilitados
   let chefIds = (await prisma.cocinaChef.findMany({ where: { activo: true } }))
     .map(c => c.chefId);
 
@@ -45,38 +91,45 @@ async function rebalanceAssignments() {
     return;
   }
 
-  // 2) Pool: PENDIENTE + PLATILLO + sin chef, prioriza los más antiguos
+  // 2) Pool PENDIENTE sin chef
   const pool = await prisma.ordenItem.findMany({
     where: { estado: "PENDIENTE", chefId: null, tipo: "PLATILLO" },
     orderBy: { creadoEn: "asc" }
   });
   console.log("[REB] pendientes sin chef:", pool.length);
 
-  // 3) Reparto 4 por chef (cuenta ASIGNADO|PREPARANDO como abiertos)
-  for (const chefId of chefIds) {
-    const abiertos = await prisma.ordenItem.count({
-      where: { chefId, estado: { in: ["ASIGNADO", "PREPARANDO"] } }
-    });
-    const capacidad = Math.max(0, CAPACIDAD_POR_CHEF - abiertos);
-    console.log(`[REB] chef ${chefId} abiertos=${abiertos} cap=${capacidad}`);
+  // 3) Balancea asignación por carga actual (menor primero)
+  const cargas = await Promise.all(
+    chefIds.map(async id => ({
+      id,
+      abiertos: await prisma.ordenItem.count({
+        where: { chefId: id, estado: { in: ["ASIGNADO", "PREPARANDO"] } }
+      })
+    }))
+  );
+  cargas.sort((a, b) => a.abiertos - b.abiertos);
+
+  for (const chef of cargas) {
+    const capacidad = Math.max(0, CAPACIDAD_POR_CHEF - chef.abiertos);
+    console.log(`[REB] chef ${chef.id} abiertos=${chef.abiertos} cap=${capacidad}`);
     if (capacidad <= 0) continue;
 
     const aAsignar = pool.splice(0, capacidad);
     for (const item of aAsignar) {
       await prisma.ordenItem.update({
         where: { id: item.id },
-        data: { chefId, estado: "ASIGNADO", asignadoEn: new Date() }
+        data: { chefId: chef.id, estado: "ASIGNADO", asignadoEn: new Date() }
       });
-      console.log("[REB] asignado item", item.id, "-> chef", chefId);
+      console.log("[REB] asignado item", item.id, "-> chef", chef.id);
     }
   }
 
-  // 4) Auto-promoción: si un chef no tiene PREPARANDO pero sí cola, promueve el más antiguo
-  for (const chefId of chefIds) {
-    await promoteNextForChef(chefId);
+  // 4) Auto-promoción para cada chef
+  for (const chef of cargas) {
+    await promoteNextForChef(chef.id);
   }
 
   console.log("[REB] end");
 }
 
-module.exports = { rebalanceAssignments, promoteNextForChef };
+module.exports = { rebalanceAssignments, promoteNextForChef, reassignItemToAnotherChef };

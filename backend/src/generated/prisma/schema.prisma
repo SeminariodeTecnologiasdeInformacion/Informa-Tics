@@ -8,7 +8,12 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
-// 1) Usuario
+/**
+ * =========================
+ * MODELOS DE USUARIO/ROLES
+ * =========================
+ */
+
 model Usuario {
   id            Int      @id @default(autoincrement())
   nombre        String
@@ -35,22 +40,6 @@ model Usuario {
   cocinaEstado CocinaChef?
 }
 
-// 2) Platillo
-model Platillo {
-  id         Int      @id @default(autoincrement())
-  nombre     String   @unique
-  precio     Float
-  creadoEn   DateTime @default(now())
-  disponible Boolean  @default(true)
-  imagenUrl  String?
-
-  categoriaId Int
-  categoria   Categoria @relation(fields: [categoriaId], references: [id])
-
-  historialModificaciones HistorialModificacion[]
-}
-
-// 3) Rol
 model Rol {
   id       Int             @id @default(autoincrement())
   nombre   String          @unique
@@ -75,7 +64,40 @@ model PermisoPorRol {
   @@unique([permisoId, rolId])
 }
 
-// 4) Historial de modificaciones
+/**
+ * =========================
+ * CATALOGO: CATEGORÍAS/PLATILLOS
+ * =========================
+ */
+
+model Categoria {
+  id        Int        @id @default(autoincrement())
+  nombre    String     @unique
+  activo    Boolean    @default(true)
+  creadoEn  DateTime   @default(now())
+  platillos Platillo[]
+}
+
+model Platillo {
+  id         Int      @id @default(autoincrement())
+  nombre     String   @unique
+  precio     Float
+  creadoEn   DateTime @default(now())
+  disponible Boolean  @default(true)
+  imagenUrl  String?
+
+  categoriaId Int
+  categoria   Categoria @relation(fields: [categoriaId], references: [id])
+
+  historialModificaciones HistorialModificacion[]
+}
+
+/**
+ * =========================
+ * HISTORIAL
+ * =========================
+ */
+
 model HistorialModificacion {
   id            Int      @id @default(autoincrement())
   campo         String
@@ -94,16 +116,12 @@ model HistorialModificacion {
   platillo   Platillo? @relation(fields: [platilloId], references: [id])
 }
 
-// 5) Categoría
-model Categoria {
-  id        Int        @id @default(autoincrement())
-  nombre    String     @unique
-  activo    Boolean    @default(true)
-  creadoEn  DateTime   @default(now())
-  platillos Platillo[]
-}
+/**
+ * =========================
+ * ORDEN / DETALLE
+ * =========================
+ */
 
-// 6) Orden
 model Orden {
   id Int @id @default(autoincrement())
 
@@ -111,46 +129,33 @@ model Orden {
   codigo String @unique @default(dbgenerated("upper(substr(md5(random()::text),1,5))")) @db.VarChar(5)
 
   mesa        Int
-  fecha       DateTime  @default(now()) // (creación)
-  finishedAt  DateTime? // <-- NUEVO: momento en que se terminó
-  durationSec Int? // <-- NUEVO: duración total en segundos
+  fecha       DateTime  @default(now()) // creación de la orden
+  finishedAt  DateTime? // CUÁNDO terminó toda la orden
+  durationSec Int? // DURACIÓN total en segundos (finishedAt - fecha)
 
   meseroId Int
   mesero   Usuario @relation("OrdenesDelMesero", fields: [meseroId], references: [id])
 
-  items OrdenItem[]
-
-  estado String @default("En espera")
+  items  OrdenItem[]
+  estado String      @default("En espera")
 
   @@index([fecha])
   @@index([finishedAt])
 }
 
-// 7) OrdenItem (detalle)
-enum OrdenItemEstado {
-  PENDIENTE
-  ASIGNADO
-  PREPARANDO
-  LISTO
-}
-
-enum OrdenItemTipo {
-  PLATILLO
-  BEBIDA
-}
-
-// 8) OrdenItem
 model OrdenItem {
   id     Int     @id @default(autoincrement())
   nombre String
   precio Float
   nota   String?
-  // Mantengo string para no romper migraciones tuyas previas:
-  tipo   String // (valores esperados: "PLATILLO" | "BEBIDA")
-  estado String // (valores esperados: "PENDIENTE" | "ASIGNADO" | "PREPARANDO" | "LISTO")
 
-  creadoEn DateTime @default(now())
+  // Mantener como String para no romper datos; valores esperados:
+  // tipo: "PLATILLO" | "BEBIDA"
+  // estado: "PENDIENTE" | "ASIGNADO" | "PREPARANDO" | "LISTO"
+  tipo   String
+  estado String
 
+  creadoEn     DateTime  @default(now())
   asignadoEn   DateTime?
   finalizadoEn DateTime?
   prioridad    Int?
@@ -165,7 +170,26 @@ model OrdenItem {
   @@index([ordenId, tipo, estado])
 }
 
-// 9) Actividad de chefs (quién está activo en cocina)
+/**
+ * (Opcional) si deseas migrar a enums nativos más adelante:
+ * enum OrdenItemTipo {
+ * PLATILLO
+ * BEBIDA
+ * }
+ * enum OrdenItemEstado {
+ * PENDIENTE
+ * ASIGNADO
+ * PREPARANDO
+ * LISTO
+ * }
+ */
+
+/**
+ * =========================
+ * COCINA (estado de chefs)
+ * =========================
+ */
+
 model CocinaChef {
   id       Int      @id @default(autoincrement())
   chefId   Int      @unique

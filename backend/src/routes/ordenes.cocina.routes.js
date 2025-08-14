@@ -1,7 +1,11 @@
 // backend/src/routes/ordenes.cocina.routes.js
 const express = require("express");
 const { PrismaClient } = require("../generated/prisma");
-const { rebalanceAssignments, promoteNextForChef } = require("../services/cocina.assigner");
+const {
+  rebalanceAssignments,
+  promoteNextForChef,
+  reassignItemToAnotherChef, // 👈 import clave
+} = require("../services/cocina.assigner");
 
 const prisma = new PrismaClient();
 const router = express.Router();
@@ -107,7 +111,7 @@ router.post("/items/:itemId/aceptar", async (req, res) => {
   }
 });
 
-// ===== Rechazar (volver a pool)
+// ===== Rechazar (enviar a OTRO chef o dejar pendiente)
 router.post("/items/:itemId/rechazar", async (req, res) => {
   const itemId = Number(req.params.itemId);
   const chefId = Number(req.body?.chefId);
@@ -118,14 +122,28 @@ router.post("/items/:itemId/rechazar", async (req, res) => {
     if (!item) return res.status(404).json({ error: "Ítem no encontrado" });
     if (item.chefId && item.chefId !== chefId) return res.status(409).json({ error: "Ítem de otro chef" });
 
+    // 1) Liberar: vuelve a pool (PENDIENTE, sin chef)
     await prisma.ordenItem.update({
       where: { id: itemId },
       data: { chefId: null, estado: "PENDIENTE", asignadoEn: null }
     });
 
-    await rebalanceAssignments();
+    // 2) Intentar reasignar a OTRO chef (nunca al que rechazó)
+    const reasignado = await reassignItemToAnotherChef(itemId, chefId);
+
+    // 3) Asegurar que el chef que rechazó siga fluido (si no tiene PREPARANDO, promover de su cola)
     await promoteNextForChef(chefId);
-    res.json({ mensaje: "Rechazado y reasignado" });
+
+    // 👇 No forzamos rebalance inmediato para evitar que el ítem regrese al mismo chef si no hubo cupo.
+    // El rebalance normal ocurrirá en heartbeat / mis / listo.
+    // Si quieres, puedes descomentar la siguiente línea para reequilibrar el resto del pool:
+    // await rebalanceAssignments();
+
+    res.json({
+      mensaje: reasignado
+        ? "Rechazado y enviado a otro cocinero"
+        : "Rechazado: queda en espera hasta que otro cocinero tenga espacio"
+    });
   } catch (e) {
     console.error("POST /items/:id/rechazar ->", e?.message);
     res.status(500).json({ error: "No se pudo rechazar" });
@@ -179,8 +197,8 @@ router.get('/historial', async (req, res) => {
             id: true,
             codigo: true,
             mesa: true,
-            finishedAt: true,     // <- para que el front lo muestre si quieres
-            durationSec: true,    // <- ESTA ES LA CLAVE
+            finishedAt: true,
+            durationSec: true,
           },
         },
       },

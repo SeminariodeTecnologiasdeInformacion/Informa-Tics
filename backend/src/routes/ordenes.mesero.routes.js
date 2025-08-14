@@ -10,7 +10,7 @@ const router = express.Router();
 router.get("/", async (_req, res) => {
   try {
     const ordenes = await prisma.orden.findMany({
-      where: { finishedAt: null },                // <<< NO mostrar finalizadas
+      where: { finishedAt: null },
       orderBy: { fecha: "desc" },
       include: {
         mesero: { select: { id: true, nombre: true } },
@@ -75,7 +75,148 @@ router.post("/", async (req, res) => {
   }
 });
 
-/** Anexar items */
+/** Obtener detalle de una orden (para modo edición) */
+router.get("/:id", async (req, res) => {
+  const id = Number(req.params.id);
+  if (!id) return res.status(400).json({ error: "ID inválido" });
+  try {
+    const orden = await prisma.orden.findUnique({
+      where: { id },
+      include: {
+        mesero: { select: { id: true, nombre: true } },
+        items: {
+          select: {
+            id: true,
+            nombre: true,
+            precio: true,
+            nota: true,
+            tipo: true,
+            estado: true,
+            chefId: true,
+          },
+          orderBy: { id: "asc" },
+        },
+      },
+    });
+    if (!orden) return res.status(404).json({ error: "Orden no encontrada" });
+    res.json(orden);
+  } catch (e) {
+    console.error("GET /ordenes/:id", e);
+    res.status(500).json({ error: "Error al obtener la orden" });
+  }
+});
+
+/**
+ * Aplicar cambios a una orden existente:
+ *  - add: array de items nuevos [{nombre, precio, nota, tipo}]
+ *  - deleteIds: array de IDs de OrdenItem a eliminar
+ *  - update: array de { id, nota } para actualizar notas de ítems existentes
+ *
+ * Reglas:
+ *  - Eliminar / Editar nota:
+ *      PLATILLO: sólo si estado=PENDIENTE y chefId=null
+ *      BEBIDA:   sólo si estado!=LISTO
+ */
+router.post("/:id/apply", async (req, res) => {
+  const id = Number(req.params.id);
+  const { add = [], deleteIds = [], update = [] } = req.body || {};
+  if (!id) return res.status(400).json({ error: "ID inválido" });
+
+  try {
+    const orden = await prisma.orden.findUnique({ where: { id }, select: { id: true } });
+    if (!orden) return res.status(404).json({ error: "Orden no encontrada" });
+
+    await prisma.$transaction(async (tx) => {
+      // === 1) Updates de nota permitidos ===
+      if (Array.isArray(update) && update.length) {
+        const idsUpd = update.map((u) => Number(u.id)).filter(Boolean);
+        if (idsUpd.length) {
+          const cand = await tx.ordenItem.findMany({
+            where: { id: { in: idsUpd }, ordenId: id },
+            select: { id: true, tipo: true, estado: true, chefId: true },
+          });
+
+          const permitidos = new Set(
+            cand
+              .filter(
+                (it) =>
+                  (it.tipo === "PLATILLO" && it.estado === "PENDIENTE" && it.chefId == null) ||
+                  (it.tipo === "BEBIDA" && it.estado !== "LISTO")
+              )
+              .map((x) => x.id)
+          );
+
+          for (const u of update) {
+            const uid = Number(u.id);
+            if (!uid || !permitidos.has(uid)) continue;
+            await tx.ordenItem.update({
+              where: { id: uid },
+              data: { nota: (u.nota ?? "") === "" ? null : String(u.nota) },
+            });
+          }
+        }
+      }
+
+      // === 2) Eliminaciones permitidas ===
+      let allowedDeleteIds = [];
+      if (Array.isArray(deleteIds) && deleteIds.length) {
+        const candidatos = await tx.ordenItem.findMany({
+          where: { id: { in: deleteIds.map(Number) }, ordenId: id },
+          select: { id: true, tipo: true, estado: true, chefId: true },
+        });
+
+        allowedDeleteIds = candidatos
+          .filter(
+            (it) =>
+              (it.tipo === "PLATILLO" && it.estado === "PENDIENTE" && it.chefId == null) ||
+              (it.tipo === "BEBIDA" && it.estado !== "LISTO")
+          )
+          .map((it) => it.id);
+
+        if (allowedDeleteIds.length) {
+          await tx.ordenItem.deleteMany({
+            where: { id: { in: allowedDeleteIds }, ordenId: id },
+          });
+        }
+      }
+
+      // === 3) Altas ===
+      if (Array.isArray(add) && add.length) {
+        await tx.ordenItem.createMany({
+          data: add.map((it) => ({
+            ordenId: id,
+            nombre: it.nombre,
+            precio: it.precio,
+            nota: it.nota || null,
+            tipo: it.tipo === "BEBIDA" ? "BEBIDA" : "PLATILLO",
+            estado: "PENDIENTE",
+          })),
+        });
+      }
+    });
+
+    // Rebalancear por si cambió la cantidad de PLATILLOS
+    await rebalanceAssignments();
+
+    const ordenActualizada = await prisma.orden.findUnique({
+      where: { id },
+      include: {
+        mesero: { select: { nombre: true } },
+        items: true,
+      },
+    });
+
+    res.json({
+      mensaje: "Cambios aplicados",
+      orden: ordenActualizada,
+    });
+  } catch (e) {
+    console.error("POST /ordenes/:id/apply", e);
+    res.status(500).json({ error: "No se pudieron aplicar los cambios" });
+  }
+});
+
+/** (Sigue disponible) Anexar items a orden existente */
 router.post("/:id/items", async (req, res) => {
   const id = Number(req.params.id);
   const { items } = req.body;
@@ -114,7 +255,7 @@ router.post("/:id/items", async (req, res) => {
   }
 });
 
-/** Eliminar */
+/** Eliminar orden */
 router.delete("/:id", async (req, res) => {
   const id = Number(req.params.id);
   try {
@@ -127,11 +268,7 @@ router.delete("/:id", async (req, res) => {
   }
 });
 
-/**
- * FINALIZAR ORDEN
- * PATCH /ordenes/:id/finalizar
- * Requiere que **todos los PLATILLOS** estén LISTO.
- */
+/** Finalizar orden (todos los PLATILLOS en LISTO) */
 router.patch("/:id/finalizar", async (req, res) => {
   const id = Number(req.params.id);
   if (!id) return res.status(400).json({ error: "ordenId inválido" });
@@ -146,10 +283,10 @@ router.patch("/:id/finalizar", async (req, res) => {
       return res.status(400).json({ error: "La orden ya está finalizada" });
     }
 
-    // todos los platillos listos (las bebidas no bloquean)
     const platillos = orden.items.filter((it) => (it.tipo || "").toUpperCase() !== "BEBIDA");
-    const ok = platillos.length > 0 &&
-               platillos.every((it) => (it.estado || "").toUpperCase() === "LISTO");
+    const ok =
+      platillos.length > 0 &&
+      platillos.every((it) => (it.estado || "").toUpperCase() === "LISTO");
     if (!ok) return res.status(409).json({ error: "Aún hay platillos sin terminar" });
 
     const now = new Date();

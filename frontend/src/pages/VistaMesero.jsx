@@ -1,3 +1,4 @@
+// frontend/src/pages/VistaMesero.jsx
 import React, { useEffect, useMemo, useState } from 'react';
 import axios from 'axios';
 import { useNavigate } from 'react-router-dom';
@@ -16,11 +17,18 @@ export default function VistaMesero() {
   const [platillos, setPlatillos] = useState([]);
   const [categoriaSeleccionada, setCategoriaSeleccionada] = useState(null);
 
-  // carrito: NUEVOS items
-  const [carrito, setCarrito] = useState([]);
-  // existentes de la orden en edición (solo lectura)
-  const [existentes, setExistentes] = useState([]);
+  // EXISTENTES (de la orden en edición) + marcados para borrar
+  const [existentes, setExistentes] = useState([]);           // [{id, nombre, precio, nota, tipo, estado, chefId}]
+  const [deleteIds, setDeleteIds] = useState(new Set());      // ids marcados para eliminar
 
+  // Cambios de nota en EXISTENTES (sin guardar aún)
+  const [updatesNota, setUpdatesNota] = useState(new Map());  // id -> nota (string|null)
+  const [editNotaModal, setEditNotaModal] = useState(false);
+  const [editTarget, setEditTarget] = useState(null);         // { id, nombre }
+  const [notaExistenteTemporal, setNotaExistenteTemporal] = useState('');
+
+  // NUEVOS a agregar
+  const [carrito, setCarrito] = useState([]);
   const [mostrarNotas, setMostrarNotas] = useState(false);
   const [platilloActual, setPlatilloActual] = useState(null);
   const [notaTemporal, setNotaTemporal] = useState('');
@@ -42,11 +50,10 @@ export default function VistaMesero() {
   };
 
   useEffect(() => {
-
     obtenerCategoriasVisibles();
     obtenerPlatillosFiltrados();
 
-    // Si vengo a editar, cargo EXISTENTES como solo lectura
+    // Si vengo a editar
     const raw = localStorage.getItem('ordenEnEdicion');
     if (raw) {
       try {
@@ -54,22 +61,32 @@ export default function VistaMesero() {
         setOrdenEditId(ord.id);
         setOrdenEditCodigo(ord.codigo || `#${ord.id}`);
         setMesaSeleccionada(ord.mesa || null);
-
-        const ex = (ord.items || []).map((it) => ({
-          uid: `ex_${it.id || Math.random()}`,
-          id: it.id,
-          nombre: it.nombre,
-          precio: it.precio,
-          nota: it.nota || '',
-          cantidad: 1,
-          tipo: it.tipo === 'BEBIDA' ? 'BEBIDA' : 'PLATILLO',
-          existente: true,
-        }));
-        setExistentes(ex);
-        setCarrito([]); // muy importante para NO duplicar
+        cargarOrdenExistente(ord.id);
       } catch {}
     }
   }, []);
+
+  const cargarOrdenExistente = async (id) => {
+    try {
+      const { data } = await axios.get(`${API}/ordenes/${id}`);
+      const items = (data?.items || []).map(it => ({
+        id: it.id,
+        nombre: it.nombre,
+        precio: it.precio,
+        nota: it.nota || '',
+        tipo: it.tipo === 'BEBIDA' ? 'BEBIDA' : 'PLATILLO',
+        estado: it.estado,
+        chefId: it.chefId || null,
+      }));
+      setExistentes(items);
+      setDeleteIds(new Set());
+      setUpdatesNota(new Map());
+      setCarrito([]);
+    } catch (e) {
+      console.error('cargarOrdenExistente', e);
+      showToast('No se pudieron cargar los ítems de la orden', 'danger');
+    }
+  };
 
   const obtenerCategoriasVisibles = async () => {
     try {
@@ -160,6 +177,48 @@ export default function VistaMesero() {
   const moverATipo = (uid, nuevoTipo) =>
     setCarrito((prev) => prev.map((x) => (x.uid === uid ? { ...x, tipo: nuevoTipo } : x)));
 
+  // ===== Marcar/Desmarcar para eliminar (existentes) =====
+  const toggleEliminarExistente = (id) => {
+    setDeleteIds((prev) => {
+      const n = new Set(prev);
+      if (n.has(id)) n.delete(id);
+      else n.add(id);
+      return n;
+    });
+  };
+
+  // ===== Editar nota en EXISTENTES =====
+  const puedeEditarNota = (it) => {
+    if (it.tipo === 'PLATILLO') {
+      return it.estado === 'PENDIENTE' && !it.chefId;
+    }
+    // BEBIDA
+    return it.estado !== 'LISTO';
+  };
+
+  const abrirEditarNota = (it) => {
+    setEditTarget({ id: it.id, nombre: it.nombre });
+    setNotaExistenteTemporal(it.nota || '');
+    setEditNotaModal(true);
+  };
+
+  const confirmarEditarNota = () => {
+    if (!editTarget) return;
+    const cleaned = (notaExistenteTemporal || '').trim();
+    setUpdatesNota((prev) => {
+      const m = new Map(prev);
+      m.set(editTarget.id, cleaned === '' ? null : cleaned);
+      return m;
+    });
+    // Reflejar en UI local
+    setExistentes((prev) =>
+      prev.map((x) => (x.id === editTarget.id ? { ...x, nota: cleaned } : x))
+    );
+    setEditNotaModal(false);
+    setEditTarget(null);
+    setNotaExistenteTemporal('');
+  };
+
   // ===== Drag & Drop =====
   const onDragStart = (p, tipoDefault = 'PLATILLO') => (e) => {
     e.dataTransfer.setData('app/pizza', JSON.stringify({ ...p, tipo: tipoDefault }));
@@ -174,31 +233,69 @@ export default function VistaMesero() {
     } catch {}
   };
 
-  // ===== Enviar orden =====
+  // ===== Totales =====
   const total = useMemo(
     () =>
       [...existentes, ...carrito].reduce((s, it) => s + it.precio * (it.cantidad || 1), 0),
     [existentes, carrito]
   );
 
-  const enviarOrden = async () => {
+  // ===== Guardar / Enviar =====
+  const guardarCambios = async () => {
+    // Altas
+    const addPlano = carrito.flatMap((item) => {
+      const cantidad = item.cantidad || 1;
+      const nota = (item.nota || '').trim();
+      return Array.from({ length: cantidad }).map(() => ({
+        nombre: item.nombre,
+        precio: item.precio,
+        nota: nota === '' ? null : nota,
+        tipo: item.tipo === 'BEBIDA' ? 'BEBIDA' : 'PLATILLO',
+      }));
+    });
+    // Bajas
+    const delIds = Array.from(deleteIds);
+    // Updates de nota
+    const upd = Array.from(updatesNota.entries()).map(([id, nota]) => ({
+      id,
+      nota,
+    }));
+
+    // Si no hay cambios, permite salir
+    if (addPlano.length === 0 && delIds.length === 0 && upd.length === 0) {
+      salirSinCambios();
+      return;
+    }
+
+    try {
+      await axios.post(`${API}/ordenes/${ordenEditId}/apply`, {
+        add: addPlano,
+        deleteIds: delIds,
+        update: upd,
+      });
+      showToast('Cambios aplicados', 'success');
+      localStorage.removeItem('ordenEnEdicion');
+      setCarrito([]);
+      setDeleteIds(new Set());
+      setUpdatesNota(new Map());
+      navigate('/mesero/ordenes');
+    } catch (error) {
+      console.error('apply orden', error);
+      showToast(error?.response?.data?.error || 'No se pudieron aplicar los cambios', 'danger');
+    }
+  };
+
+  const enviarNuevaOrden = async () => {
     if (!mesaSeleccionada) {
       showToast('Selecciona una mesa', 'danger');
       return;
     }
-    // Nuevos que sí se envían
-    const nuevos = carrito;
-    if (!ordenEditId && nuevos.length === 0) {
+    if (carrito.length === 0) {
       showToast('Agrega productos', 'danger');
       return;
     }
-    // En edición: si no agregaste nada, no se envía nada
-    if (ordenEditId && nuevos.length === 0) {
-      showToast('No agregaste nuevos ítems.', 'danger');
-      return;
-    }
 
-    const itemsPlano = nuevos.flatMap((item) => {
+    const itemsPlano = carrito.flatMap((item) => {
       const cantidad = item.cantidad || 1;
       const nota = (item.nota || '').trim();
       return Array.from({ length: cantidad }).map(() => ({
@@ -210,34 +307,28 @@ export default function VistaMesero() {
     });
 
     try {
-      if (ordenEditId) {
-        await axios.post(`${API}/ordenes/${ordenEditId}/items`, { items: itemsPlano });
-        showToast(`Ítems añadidos a la orden ${ordenEditCodigo}`, 'success');
-        localStorage.removeItem('ordenEnEdicion');
-      } else {
-        await axios.post(`${API}/ordenes`, {
-          mesa: mesaSeleccionada,
-          meseroId: usuario.id,
-          items: itemsPlano,
-        });
-        showToast('Orden enviada exitosamente', 'success');
-      }
-
-      // limpiar estado local
+      await axios.post(`${API}/ordenes`, {
+        mesa: mesaSeleccionada,
+        meseroId: usuario.id,
+        items: itemsPlano,
+      });
+      showToast('Orden enviada exitosamente', 'success');
       setCarrito([]);
       setExistentes([]);
       setMesaSeleccionada(null);
       setMostrarMesaModal(false);
       setOrdenEditId(null);
       setOrdenEditCodigo(null);
-
-      setTimeout(() => {
-        navigate('/mesero/ordenes');
-      }, 700);
+      setTimeout(() => navigate('/mesero/ordenes'), 700);
     } catch (error) {
       console.error('enviar orden', error);
       showToast(error?.response?.data?.error || 'Error al enviar la orden', 'danger');
     }
+  };
+
+  const salirSinCambios = () => {
+    localStorage.removeItem('ordenEnEdicion');
+    navigate('/mesero/ordenes');
   };
 
   const chipMesa = {
@@ -260,7 +351,7 @@ export default function VistaMesero() {
         overflow: 'hidden',
       }}
     >
-      <PageTopBar title={ordenEditId ? 'Generar Orden (Edición)' : 'Generar Orden'} backTo="/panel" />
+      <PageTopBar title={ordenEditId ? 'Editar Orden' : 'Generar Orden'} backTo="/panel" />
 
       <div style={{ display: 'flex', flex: 1, overflow: 'hidden', width: '100%', boxSizing: 'border-box' }}>
         {/* Sidebar IZQ: Categorías activas con platillos */}
@@ -300,8 +391,10 @@ export default function VistaMesero() {
                 marginBottom: '1rem',
               }}
             >
-              <strong>Editando</strong> la orden <b>{ordenEditCodigo}</b>. Solo se enviarán los ítems nuevos (los
-              existentes no se modifican).
+              Editando la orden <b>{ordenEditCodigo || `#${ordenEditId}`}</b>.  
+              <span style={{ marginLeft: 10, color: '#7c2d12' }}>
+                Marca para eliminar ítems existentes permitidos, agrega nuevos o edita la nota.
+              </span>
             </div>
           )}
 
@@ -358,9 +451,9 @@ export default function VistaMesero() {
           </div>
         </div>
 
-        {/* Panel derecha: Pedido */}
-        <div style={{ flex: '0 0 420px', padding: '0', borderLeft: '2px solid #ccc', background: '#fff', display: 'flex', flexDirection: 'column' }}>
-          {/* Header sticky: mesa + total */}
+        {/* Panel derecha: EXISTENTES + NUEVOS + header sticky */}
+        <div style={{ flex: '0 0 480px', padding: '0', borderLeft: '2px solid #ccc', background: '#fff', display: 'flex', flexDirection: 'column' }}>
+          {/* Header sticky */}
           <div
             style={{
               position: 'sticky',
@@ -376,47 +469,136 @@ export default function VistaMesero() {
             }}
           >
             <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
-              <strong>Mesa:</strong>
-              {mesaSeleccionada ? (
-                <span style={chipMesa}>#{mesaSeleccionada}</span>
+              {ordenEditId ? (
+                <strong>Modo edición</strong>
               ) : (
-                <span style={{ color: '#64748b' }}>sin asignar</span>
+                <>
+                  <strong>Mesa:</strong>
+                  {mesaSeleccionada ? (
+                    <span style={chipMesa}>#{mesaSeleccionada}</span>
+                  ) : (
+                    <span style={{ color: '#64748b' }}>sin asignar</span>
+                  )}
+                  <span style={{ marginLeft: 8, color: '#334155', fontWeight: 700 }}>Total: Q{total.toFixed(2)}</span>
+                </>
               )}
-              <span style={{ marginLeft: 8, color: '#334155', fontWeight: 700 }}>Total: Q{total.toFixed(2)}</span>
             </div>
 
-            <button
-              onClick={() => setMostrarMesaModal(true)}
-              style={{ padding: '.6rem 1rem', background: '#006666', color: '#fff', border: 'none', borderRadius: 6 }}
-            >
-              {ordenEditId ? 'Anexar a la orden' : 'Enviar orden'}
-            </button>
+            <div style={{ display: 'flex', gap: 8 }}>
+              {ordenEditId ? (
+                <>
+                  <button onClick={salirSinCambios} style={btnGhost}>Salir sin cambios</button>
+                  <button onClick={guardarCambios} style={btnConfirm}>Guardar cambios</button>
+                </>
+              ) : (
+                <button onClick={() => setMostrarMesaModal(true)} style={btnConfirm}>
+                  Enviar orden
+                </button>
+              )}
+            </div>
           </div>
 
           {/* Cuerpo scrollable */}
-          <div style={{ padding: '1rem', overflowY: 'auto' }}>
-            <h2 style={{ marginTop: 0 }}>Pedido</h2>
+          <div style={{ padding: '1rem', overflowY: 'auto', display: 'grid', gap: 16 }}>
+            {/* EXISTENTES en la orden */}
+            {ordenEditId && (
+              <section style={section}>
+                <h3 style={{ marginTop: 0 }}>Ya en la orden</h3>
+                {existentes.length === 0 ? (
+                  <div style={emptyBox}>Sin ítems previos.</div>
+                ) : (
+                  <div style={{ display: 'grid', gap: 8 }}>
+                    {existentes.map((it) => {
+                      const bloqueado = it.tipo === 'PLATILLO'
+                        ? !(it.estado === 'PENDIENTE' && !it.chefId)
+                        : it.estado === 'LISTO';
+                      const marcado = deleteIds.has(it.id);
+                      const editado = updatesNota.has(it.id);
 
-            <div style={{ display: 'grid', gap: 12 }}>
+                      return (
+                        <div key={it.id} style={{
+                          padding: '10px 12px',
+                          border: '1px solid #e5e7eb',
+                          borderRadius: 8,
+                          background: marcado ? '#fee2e2' : '#f8fafc',
+                          opacity: bloqueado ? .7 : 1
+                        }}>
+                          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 12 }}>
+                            <div style={{ flex: 1 }}>
+                              <strong>{it.nombre}</strong> • Q{Number(it.precio).toFixed(2)} • {it.tipo}
+                              {it.nota ? (
+                                <div style={{ fontSize: 13, color: '#6b7280' }}>
+                                  <em>Nota: {it.nota}</em>{' '}
+                                  {editado && <span style={{ marginLeft: 6, fontWeight: 700, color: '#0f766e' }}>(editada)</span>}
+                                </div>
+                              ) : (
+                                <div style={{ fontSize: 13, color: '#6b7280' }}>
+                                  <em>Sin nota</em> {editado && <span style={{ marginLeft: 6, fontWeight: 700, color: '#0f766e' }}>(agregada)</span>}
+                                </div>
+                              )}
+                              <div style={{ fontSize: 12, color: '#6b7280' }}>
+                                Estado: {it.estado}{it.chefId ? ` • Chef ${it.chefId}` : ''}
+                              </div>
+                            </div>
+                            <div style={{ display: 'flex', gap: 8 }}>
+                              <button
+                                disabled={bloqueado}
+                                onClick={() => abrirEditarNota(it)}
+                                style={{
+                                  padding: '.4rem .7rem',
+                                  borderRadius: 6,
+                                  border: '1px solid #94a3b8',
+                                  background: '#fff',
+                                  color: '#0f172a',
+                                  cursor: bloqueado ? 'not-allowed' : 'pointer',
+                                  fontWeight: 700
+                                }}
+                                title={bloqueado ? 'No se puede editar nota (ya en cocina o entregado)' : 'Editar nota'}
+                              >
+                                Editar nota
+                              </button>
+
+                              <button
+                                disabled={bloqueado}
+                                onClick={() => toggleEliminarExistente(it.id)}
+                                style={{
+                                  padding: '.4rem .7rem',
+                                  borderRadius: 6,
+                                  border: 'none',
+                                  cursor: bloqueado ? 'not-allowed' : 'pointer',
+                                  background: marcado ? '#991b1b' : '#ef4444',
+                                  color: '#fff',
+                                  fontWeight: 700
+                                }}
+                                title={bloqueado ? 'No se puede eliminar (ya en cocina o entregado)' : (marcado ? 'Deshacer' : 'Marcar para eliminar')}
+                              >
+                                {marcado ? 'Deshacer' : 'Eliminar'}
+                              </button>
+                            </div>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
+                <div style={{ marginTop: 6, fontSize: 13, color: '#64748b' }}>
+                  * Reglas: PLATILLO en espera (sin chef) y BEBIDA no entregada permiten editar nota/eliminar.
+                </div>
+              </section>
+            )}
+
+            {/* NUEVOS a agregar */}
+            <section style={section}>
+              <h3 style={{ marginTop: 0 }}>{ordenEditId ? 'Nuevos a agregar' : 'Pedido'}</h3>
+
               {/* Zona platillos */}
               <div
                 onDragOver={allowDrop}
                 onDrop={onDropEn('PLATILLO')}
-                style={{ background: '#f1f5f9', border: '2px dashed #0f766e', minHeight: 120, borderRadius: 10, padding: 10 }}
+                style={{ background: '#f1f5f9', border: '2px dashed #0f766e', minHeight: 120, borderRadius: 10, padding: 10, marginBottom: 12 }}
               >
-                <h3 style={{ marginTop: 0 }}>🍽️ Platillos (para cocina)</h3>
-
-                {/* EXISTENTES (solo lectura) */}
-                {existentes.filter((i) => i.tipo === 'PLATILLO').map((item) => (
-                  <div key={item.uid} style={{ marginBottom: '0.6rem', background: '#e2e8f0', padding: '0.6rem', borderRadius: 8 }}>
-                    <strong>{item.nombre}</strong> – Q{item.precio.toFixed(2)}
-                    {item.nota && <div><em>Nota: {item.nota}</em></div>}
-                    <div style={{ fontSize: 12, color: '#64748b' }}>No se modifica</div>
-                  </div>
-                ))}
-
-                {/* NUEVOS del carrito */}
-                {carrito.filter((i) => i.tipo === 'PLATILLO').length === 0 && existentes.filter((i) => i.tipo === 'PLATILLO').length === 0 ? (
+                <h4 style={{ marginTop: 0 }}>🍽️ Platillos (para cocina)</h4>
+                {carrito.filter((i) => i.tipo === 'PLATILLO').length === 0 && (!ordenEditId || existentes.filter((i) => i.tipo === 'PLATILLO').length === 0) ? (
                   <p style={{ margin: 0, color: '#64748b' }}>Arrastra aquí o usa “Agregar”.</p>
                 ) : null}
 
@@ -459,19 +641,8 @@ export default function VistaMesero() {
                 onDrop={onDropEn('BEBIDA')}
                 style={{ background: '#fef3c7', border: '2px dashed #ea580c', minHeight: 120, borderRadius: 10, padding: 10 }}
               >
-                <h3 style={{ marginTop: 0 }}>🥤 Bebidas (las prepara el mesero)</h3>
-
-                {/* EXISTENTES (solo lectura) */}
-                {existentes.filter((i) => i.tipo === 'BEBIDA').map((item) => (
-                  <div key={item.uid} style={{ marginBottom: '0.6rem', background: '#fde68a', padding: '0.6rem', borderRadius: 8 }}>
-                    <strong>{item.nombre}</strong> – Q{item.precio.toFixed(2)}
-                    {item.nota && <div><em>Nota: {item.nota}</em></div>}
-                    <div style={{ fontSize: 12, color: '#a16207' }}>No se modifica</div>
-                  </div>
-                ))}
-
-                {/* NUEVOS del carrito */}
-                {carrito.filter((i) => i.tipo === 'BEBIDA').length === 0 && existentes.filter((i) => i.tipo === 'BEBIDA').length === 0 ? (
+                <h4 style={{ marginTop: 0 }}>🥤 Bebidas (las prepara el mesero)</h4>
+                {carrito.filter((i) => i.tipo === 'BEBIDA').length === 0 && (!ordenEditId || existentes.filter((i) => i.tipo === 'BEBIDA').length === 0) ? (
                   <p style={{ margin: 0, color: '#a16207' }}>Arrastra aquí si es bebida.</p>
                 ) : null}
 
@@ -507,7 +678,13 @@ export default function VistaMesero() {
                     );
                   })}
               </div>
-            </div>
+
+              {!ordenEditId && (
+                <div style={{ marginTop: 10, color: '#334155', fontWeight: 700 }}>
+                  Total nuevos: Q{total.toFixed(2)}
+                </div>
+              )}
+            </section>
           </div>
         </div>
       </div>
@@ -520,7 +697,7 @@ export default function VistaMesero() {
         onClose={() => setToast((prev) => ({ ...prev, show: false }))}
       />
 
-      {/* Modal nota */}
+      {/* Modal nota NUEVO item */}
       {mostrarNotas && (
         <div style={modalStyle}>
           <div style={modalContent}>
@@ -543,14 +720,36 @@ export default function VistaMesero() {
         </div>
       )}
 
-      {/* Modal mesa */}
-      {mostrarMesaModal && (
+      {/* Modal nota EXISTENTE */}
+      {editNotaModal && (
         <div style={modalStyle}>
           <div style={modalContent}>
             <h3 style={{ marginTop: 0, marginBottom: 12 }}>
-              {ordenEditId ? `Confirmar mesa (Orden ${ordenEditCodigo})` : 'Asignar mesa'}
+              Nota para: <span style={{ color: '#0f766e' }}>{editTarget?.nombre}</span>
             </h3>
+            <textarea
+              value={notaExistenteTemporal}
+              onChange={(e) => setNotaExistenteTemporal(e.target.value)}
+              placeholder="Escribe o deja vacío para quitar la nota…"
+              style={textarea}
+            />
+            <div style={modalActions}>
+              <button onClick={() => { setEditNotaModal(false); setEditTarget(null); }} style={btnGhost}>
+                Cancelar
+              </button>
+              <button onClick={confirmarEditarNota} style={btnConfirm}>
+                Guardar nota
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
+      {/* Modal mesa (solo al crear) */}
+      {mostrarMesaModal && !ordenEditId && (
+        <div style={modalStyle}>
+          <div style={modalContent}>
+            <h3 style={{ marginTop: 0, marginBottom: 12 }}>Asignar mesa</h3>
             <div style={{ display: 'flex', flexWrap: 'wrap', gap: '.5rem', margin: '1rem 0' }}>
               {Array.from({ length: 20 }, (_, i) => (
                 <button
@@ -571,13 +770,12 @@ export default function VistaMesero() {
                 </button>
               ))}
             </div>
-
             <div style={{ display: 'flex', gap: '.5rem', justifyContent: 'flex-end' }}>
               <button onClick={() => setMostrarMesaModal(false)} style={btnGhost}>
                 Cerrar
               </button>
-              <button onClick={enviarOrden} style={btnConfirm}>
-                {ordenEditId ? 'Anexar ítems' : 'Enviar orden'}
+              <button onClick={enviarNuevaOrden} style={btnConfirm}>
+                Enviar orden
               </button>
             </div>
           </div>
@@ -588,6 +786,9 @@ export default function VistaMesero() {
 }
 
 // ===== Estilos =====
+const section = { background: '#fff', borderRadius: 14, padding: 16, border: '1px solid #e5e7eb', boxShadow: '0 4px 12px rgba(0,0,0,0.04)' };
+const emptyBox = { background: '#f8fafc', border: '1px dashed #cbd5e1', borderRadius: 12, padding: '12px 10px', color: '#64748b', fontSize: 15 };
+
 const modalStyle = {
   position: 'fixed',
   inset: 0,
@@ -600,9 +801,9 @@ const modalStyle = {
 
 const modalContent = {
   background: '#fff',
-  padding: '24px',
+  padding: 24,
   borderRadius: 12,
-  width: 460,
+  width: 480,
   maxWidth: '92vw',
   boxSizing: 'border-box',
   boxShadow: '0 12px 32px rgba(0,0,0,.18)',
@@ -611,7 +812,7 @@ const modalContent = {
 const textarea = {
   width: '100%',
   minHeight: 120,
-  padding: '12px',
+  padding: 12,
   fontSize: '1rem',
   border: '1px solid #cbd5e1',
   borderRadius: 10,
@@ -623,7 +824,7 @@ const textarea = {
 const modalActions = {
   display: 'flex',
   justifyContent: 'space-between',
-  marginTop: '16px',
+  marginTop: 16,
 };
 
 const btnGhost = {

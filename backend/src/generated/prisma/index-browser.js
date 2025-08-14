@@ -132,16 +132,6 @@ exports.Prisma.UsuarioScalarFieldEnum = {
   rolId: 'rolId'
 };
 
-exports.Prisma.PlatilloScalarFieldEnum = {
-  id: 'id',
-  nombre: 'nombre',
-  precio: 'precio',
-  creadoEn: 'creadoEn',
-  disponible: 'disponible',
-  imagenUrl: 'imagenUrl',
-  categoriaId: 'categoriaId'
-};
-
 exports.Prisma.RolScalarFieldEnum = {
   id: 'id',
   nombre: 'nombre'
@@ -159,6 +149,23 @@ exports.Prisma.PermisoPorRolScalarFieldEnum = {
   rolId: 'rolId'
 };
 
+exports.Prisma.CategoriaScalarFieldEnum = {
+  id: 'id',
+  nombre: 'nombre',
+  activo: 'activo',
+  creadoEn: 'creadoEn'
+};
+
+exports.Prisma.PlatilloScalarFieldEnum = {
+  id: 'id',
+  nombre: 'nombre',
+  precio: 'precio',
+  creadoEn: 'creadoEn',
+  disponible: 'disponible',
+  imagenUrl: 'imagenUrl',
+  categoriaId: 'categoriaId'
+};
+
 exports.Prisma.HistorialModificacionScalarFieldEnum = {
   id: 'id',
   campo: 'campo',
@@ -169,13 +176,6 @@ exports.Prisma.HistorialModificacionScalarFieldEnum = {
   responsableId: 'responsableId',
   usuarioId: 'usuarioId',
   platilloId: 'platilloId'
-};
-
-exports.Prisma.CategoriaScalarFieldEnum = {
-  id: 'id',
-  nombre: 'nombre',
-  activo: 'activo',
-  creadoEn: 'creadoEn'
 };
 
 exports.Prisma.OrdenScalarFieldEnum = {
@@ -229,12 +229,12 @@ exports.Prisma.NullsOrder = {
 
 exports.Prisma.ModelName = {
   Usuario: 'Usuario',
-  Platillo: 'Platillo',
   Rol: 'Rol',
   Permiso: 'Permiso',
   PermisoPorRol: 'PermisoPorRol',
-  HistorialModificacion: 'HistorialModificacion',
   Categoria: 'Categoria',
+  Platillo: 'Platillo',
+  HistorialModificacion: 'HistorialModificacion',
   Orden: 'Orden',
   OrdenItem: 'OrdenItem',
   CocinaChef: 'CocinaChef'
