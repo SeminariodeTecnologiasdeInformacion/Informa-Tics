@@ -42,15 +42,23 @@ function Login() {
 
     try {
       const res = await axios.post('http://localhost:3001/login', credenciales);
+
       const usuarioSrv = res?.data?.usuario;
       if (!usuarioSrv) throw new Error('Respuesta inválida del servidor (sin usuario).');
 
+      // Guarda usuario normalizado (incluye debeCambiarPassword si viene)
       const usuarioOK = normalizeUserForStorage(usuarioSrv);
       if (!usuarioOK) throw new Error('No fue posible normalizar los datos de usuario.');
-
       localStorage.setItem('usuario', JSON.stringify(usuarioOK));
 
-      // 👉 SIEMPRE al panel; desde ahí las vistas se habilitan por permisos
+      // ⬇️ Cambio clave: si debe cambiar la contraseña, redirige a /cambiar-password
+      const mustChange = Boolean(res?.data?.mustChange ?? usuarioSrv?.debeCambiarPassword);
+      if (mustChange) {
+        navigate('/cambiar-password', { replace: true });
+        return;
+      }
+
+      // Si no, al panel
       navigate('/panel', { replace: true });
     } catch (err) {
       console.error(err);

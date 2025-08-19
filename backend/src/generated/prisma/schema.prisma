@@ -19,10 +19,13 @@ model Usuario {
   nombre        String
   usuario       String   @unique
   correo        String   @unique
-  contrasena    String
+  contrasena    String? // HASH (opcional mientras no haya sido definida)
   estado        Boolean  @default(true)
   creadoEn      DateTime @default(now())
   actualizadoEn DateTime @updatedAt
+
+  // obliga a cambiar la contraseña cuando es temporal
+  debeCambiarPassword Boolean @default(false)
 
   rolId Int
   rol   Rol @relation(fields: [rolId], references: [id])
@@ -169,20 +172,6 @@ model OrdenItem {
   @@index([chefId, estado])
   @@index([ordenId, tipo, estado])
 }
-
-/**
- * (Opcional) si deseas migrar a enums nativos más adelante:
- * enum OrdenItemTipo {
- * PLATILLO
- * BEBIDA
- * }
- * enum OrdenItemEstado {
- * PENDIENTE
- * ASIGNADO
- * PREPARANDO
- * LISTO
- * }
- */
 
 /**
  * =========================

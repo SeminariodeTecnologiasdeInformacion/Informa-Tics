@@ -1,7 +1,8 @@
 // routes/login.routes.js
 const express = require('express');
 const router = express.Router();
-const { PrismaClient } = require('../../src/generated/prisma');
+const bcrypt = require('bcryptjs');
+const { PrismaClient } = require('../generated/prisma');
 const prisma = new PrismaClient();
 
 // Normaliza "ver menu" -> "VER_MENU"
@@ -30,23 +31,21 @@ router.post('/', async (req, res) => {
       include: { rol: true }, // rol con { id, nombre }
     });
 
-    if (!user || user.contrasena !== contrasena) {
+    // Verificación con HASH (bcrypt)
+    if (!user || !user.contrasena) {
       return res.status(401).json({ error: 'Credenciales incorrectas.' });
     }
+    const ok = await bcrypt.compare(contrasena, user.contrasena);
+    if (!ok) return res.status(401).json({ error: 'Credenciales incorrectas.' });
 
     const rolNombre = String(user.rol?.nombre || '').trim().toLowerCase();
     const isAdmin = rolNombre === 'administrador' || rolNombre === 'admin';
 
     let permisosStr = [];
-
     if (isAdmin) {
-      // Admin: todos los permisos (solo 'nombre')
-      const allPerms = await prisma.permiso.findMany({
-        select: { nombre: true },
-      });
+      const allPerms = await prisma.permiso.findMany({ select: { nombre: true } });
       permisosStr = normalizePerms(allPerms);
     } else {
-      // No admin: permisos por rol (solo 'nombre')
       const rolId = user.rolId || user.rol?.id;
       const links = await prisma.permisoPorRol.findMany({
         where: { rolId },
@@ -59,9 +58,10 @@ router.post('/', async (req, res) => {
 
     return res.status(200).json({
       mensaje: 'Inicio de sesión exitoso',
+      mustChange: Boolean(user.debeCambiarPassword), // <- para redirigir a /cambiar-password
       usuario: {
         ...usuarioSinClave,
-        permisos: permisosStr, // e.g. ["VER_MENU","GENERAR_ORDEN"]
+        permisos: permisosStr,
       },
     });
   } catch (error) {

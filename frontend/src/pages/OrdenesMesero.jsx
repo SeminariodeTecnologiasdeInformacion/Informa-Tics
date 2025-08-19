@@ -40,8 +40,6 @@ export default function OrdenesMesero() {
   const listSig = (arr) => (arr || []).map(orderSig).sort().join('|');
 
   useEffect(() => {
-
-
     cargar({ background: false });
 
     // polling más rápido
@@ -139,11 +137,20 @@ export default function OrdenesMesero() {
   };
 
   // ---- Finalizar ----
+  // Permite finalizar:
+  //  - si hay platillos y TODOS están LISTO (regla original)
+  //  - si NO hay platillos, pero sí bebidas y TODAS están LISTO (órdenes solo de bebidas)
   const puedeFinalizar = (orden) => {
     if (orden.finishedAt) return false;
-    const platillos = (orden.items || []).filter((it) => norm(it.tipo) === 'PLATILLO');
-    if (platillos.length === 0) return false;
-    return platillos.every((it) => norm(it.estado) === 'LISTO');
+    const items = Array.isArray(orden.items) ? orden.items : [];
+
+    const platillos = items.filter((it) => norm(it.tipo) === 'PLATILLO');
+    const bebidas   = items.filter((it) => norm(it.tipo) === 'BEBIDA');
+
+    if (platillos.length > 0) {
+      return platillos.every((it) => norm(it.estado) === 'LISTO');
+    }
+    return bebidas.length > 0 && bebidas.every((it) => norm(it.estado) === 'LISTO');
   };
 
   const finalizarOrden = async (orden) => {
@@ -256,8 +263,9 @@ export default function OrdenesMesero() {
             <tbody>
               {ordenes.map((orden, i) => {
                 const items = Array.isArray(orden.items) ? orden.items : [];
-                const platillos = items.filter((it) => (it.tipo || 'PLATILLO') !== 'BEBIDA');
-                const bebidas = items.filter((it) => (it.tipo || 'PLATILLO') === 'BEBIDA');
+                // ✅ filtrado robusto usando norm()
+                const platillos = items.filter((it) => norm(it.tipo) !== 'BEBIDA');
+                const bebidas   = items.filter((it) => norm(it.tipo) === 'BEBIDA');
 
                 const rows = [];
                 if (platillos.length) {
@@ -314,7 +322,7 @@ export default function OrdenesMesero() {
                             onClick={() => finalizarOrden(orden)}
                             style={{ ...accionBtn, background: '#2563eb', minWidth: 110 }}
                             disabled={finishingId === orden.id}
-                            title="Terminar orden (platillos listos)"
+                            title="Terminar orden (items listos)"
                           >
                             {finishingId === orden.id ? 'Terminando…' : 'Terminar'}
                           </button>

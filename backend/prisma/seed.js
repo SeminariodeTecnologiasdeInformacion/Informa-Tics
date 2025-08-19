@@ -1,6 +1,9 @@
 // prisma/seed.js
 const { PrismaClient } = require('../src/generated/prisma');
 const prisma = new PrismaClient();
+const bcrypt = require('bcryptjs');
+
+async function hash(p) { return bcrypt.hash(p, 12); }
 
 const PERMISOS = [
   // Administración
@@ -17,10 +20,13 @@ const PERMISOS = [
 
   // 👨‍🍳 Cocina
   { nombre: 'COCINA_VIEW', descripcion: 'Acceso a vista de cocina' },
+
+  // 🍹 Barra
+  { nombre: 'BARRA_VIEW', descripcion: 'Acceso a vista de barra' },
 ];
 
 async function main() {
-  // --- Permisos ---
+  // ---- Permisos
   for (const p of PERMISOS) {
     await prisma.permiso.upsert({
       where: { nombre: p.nombre },
@@ -29,26 +35,13 @@ async function main() {
     });
   }
 
-  // --- Roles ---
-  const admin = await prisma.rol.upsert({
-    where: { nombre: 'Administrador' },
-    update: {},
-    create: { nombre: 'Administrador' },
-  });
+  // ---- Roles
+  const admin = await prisma.rol.upsert({ where: { nombre: 'Administrador' }, update: {}, create: { nombre: 'Administrador' } });
+  const mesero = await prisma.rol.upsert({ where: { nombre: 'Mesero' }, update: {}, create: { nombre: 'Mesero' } });
+  const cocinero = await prisma.rol.upsert({ where: { nombre: 'Cocinero' }, update: {}, create: { nombre: 'Cocinero' } });
+  const bartender = await prisma.rol.upsert({ where: { nombre: 'Bartender' }, update: {}, create: { nombre: 'Bartender' } });
 
-  const mesero = await prisma.rol.upsert({
-    where: { nombre: 'Mesero' },
-    update: {},
-    create: { nombre: 'Mesero' },
-  });
-
-  const cocinero = await prisma.rol.upsert({
-    where: { nombre: 'Cocinero' },
-    update: {},
-    create: { nombre: 'Cocinero' },
-  });
-
-  // --- Vincular permisos a roles ---
+  // ---- Vincular permisos
   const todosPermisos = await prisma.permiso.findMany();
   const mapPerm = Object.fromEntries(todosPermisos.map(p => [p.nombre, p.id]));
 
@@ -61,9 +54,8 @@ async function main() {
     });
   }
 
-  // Mesero -> solo los de órdenes
-  const permisosMesero = ['GENERAR_ORDEN', 'VER_ORDENES'];
-  for (const nombre of permisosMesero) {
+  // Mesero -> órdenes
+  for (const nombre of ['GENERAR_ORDEN', 'VER_ORDENES']) {
     const pid = mapPerm[nombre];
     if (!pid) continue;
     await prisma.permisoPorRol.upsert({
@@ -73,9 +65,8 @@ async function main() {
     });
   }
 
-  // Cocinero -> acceso a vista de cocina
-  const permisosCocinero = ['COCINA_VIEW'];
-  for (const nombre of permisosCocinero) {
+  // Cocinero -> cocina
+  for (const nombre of ['COCINA_VIEW']) {
     const pid = mapPerm[nombre];
     if (!pid) continue;
     await prisma.permisoPorRol.upsert({
@@ -85,8 +76,18 @@ async function main() {
     });
   }
 
-  // --- Usuarios de prueba ---
-  // Admin
+  // Bartender -> barra
+  for (const nombre of ['BARRA_VIEW']) {
+    const pid = mapPerm[nombre];
+    if (!pid) continue;
+    await prisma.permisoPorRol.upsert({
+      where: { permisoId_rolId: { permisoId: pid, rolId: bartender.id } },
+      update: {},
+      create: { permisoId: pid, rolId: bartender.id },
+    });
+  }
+
+  // ---- Usuarios demo (con hash)
   await prisma.usuario.upsert({
     where: { usuario: 'admin' },
     update: { estado: true, rolId: admin.id },
@@ -94,13 +95,13 @@ async function main() {
       nombre: 'Admin',
       usuario: 'admin',
       correo: 'admin@demo.com',
-      contrasena: 'admin123',
+      contrasena: await hash('admin123'),
       rolId: admin.id,
       estado: true,
+      debeCambiarPassword: false,
     },
   });
 
-  // Mesero demo
   await prisma.usuario.upsert({
     where: { usuario: 'mesero1' },
     update: { estado: true, rolId: mesero.id },
@@ -108,13 +109,13 @@ async function main() {
       nombre: 'Mesero Demo',
       usuario: 'mesero1',
       correo: 'mesero1@demo.com',
-      contrasena: 'mesero123',
+      contrasena: await hash('mesero123'),
       rolId: mesero.id,
       estado: true,
+      debeCambiarPassword: false,
     },
   });
 
-  // Cocinero demo
   await prisma.usuario.upsert({
     where: { usuario: 'cocinero1' },
     update: { estado: true, rolId: cocinero.id },
@@ -122,20 +123,33 @@ async function main() {
       nombre: 'Cocinero Demo',
       usuario: 'cocinero1',
       correo: 'cocinero1@demo.com',
-      contrasena: 'cocina123',
+      contrasena: await hash('cocina123'),
       rolId: cocinero.id,
       estado: true,
+      debeCambiarPassword: false,
     },
   });
 
-  console.log('✅ Seed completado.');
+  await prisma.usuario.upsert({
+    where: { usuario: 'bart1' },
+    update: { estado: true, rolId: bartender.id },
+    create: {
+      nombre: 'Bartender Demo',
+      usuario: 'bart1',
+      correo: 'bart1@demo.com',
+      contrasena: await hash('barra123'),
+      rolId: bartender.id,
+      estado: true,
+      debeCambiarPassword: false,
+    },
+  });
+
+  console.log('✅ Seed con Bartender listo.');
 }
 
-main()
-  .catch((e) => {
-    console.error(e);
-    process.exit(1);
-  })
-  .finally(async () => {
-    await prisma.$disconnect();
-  });
+main().catch((e) => {
+  console.error(e);
+  process.exit(1);
+}).finally(async () => {
+  await prisma.$disconnect();
+});

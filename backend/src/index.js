@@ -1,4 +1,5 @@
 // backend/src/index.js
+require('dotenv').config();
 const express = require("express");
 const cors = require("cors");
 
@@ -17,11 +18,13 @@ const historialRoutes      = require("./routes/historial.routes");
 const platillosRoutes      = require("./routes/platillos.routes");
 const categoriaRoutes      = require("./routes/categoria.routes");
 const permisosRoutes       = require("./routes/permisos.routes");
-
 const ordenesMeseroRoutes  = require("./routes/ordenes.mesero.routes");
+const ordenesBarraRoutes   = require("./routes/ordenes.barra.routes");
 // Router de cocina (SIN prefijo interno)
-// (usa endpoints: /heartbeat, /desactivar, /mis, /items/:id/aceptar, /items/:id/rechazar, /items/:id/listo, /historial)
 const ordenesCocinaRoutes  = require("./routes/ordenes.cocina.routes");
+
+// ⬇️ NEW: ruta para cambio de contraseña (POST /auth/change-password)
+const changePwdRoutes      = require("./routes/auth.change.routes");
 
 // Prefijos “oficiales”
 app.use("/login", loginRoutes);
@@ -38,6 +41,14 @@ app.use("/ordenes", ordenesMeseroRoutes);
 app.use("/cocina", ordenesCocinaRoutes);         // para el front actualizado
 app.use("/ordenes/cocina", ordenesCocinaRoutes); // alias para llamadas antiguas
 
+// Bartender
+app.use("/barra", ordenesBarraRoutes);           // front nuevo
+app.use("/ordenes/barra", ordenesBarraRoutes);   // alias si algo antiguo apunta aquí
+
+
+// ⬇️ NEW: monta sin prefijo porque adentro ya define /auth/change-password
+app.use(changePwdRoutes);
+
 // ===== Healthcheck =====
 app.get("/", (_req, res) => res.send("Backend corriendo 🚀"));
 
@@ -51,6 +62,37 @@ app.use((err, _req, res, _next) => {
   console.error(err);
   res.status(500).json({ error: "Error interno del servidor" });
 });
+const { sendEmail } = require('./services/email');
+
+// ...después de tus app.use(...)
+app.get('/test-mail', async (_req, res) => {
+  try {
+    await sendEmail({
+      to: process.env.SMTP_USER, // o el correo al que quieras que llegue
+      subject: 'Prueba SMTP Gmail',
+      html: '<h3>Hola 👋</h3><p>Correo de prueba desde el backend.</p>',
+    });
+    res.send('OK: correo enviado');
+  } catch (e) {
+    console.error('❌ Error test-mail:', e);
+    res.status(500).send(e.message);
+  }
+});
+
+app.get('/test-mail', async (_req, res) => {
+  try {
+    await sendEmail({
+      to: process.env.SMTP_USER, // o cualquier destino de prueba
+      subject: 'Prueba SMTP Gmail',
+      html: '<h3>Hola 👋</h3><p>Esto es un test desde el backend.</p>',
+    });
+    res.send('OK: correo enviado');
+  } catch (e) {
+    console.error('❌ Error test-mail:', e);
+    res.status(500).send(e.message);
+  }
+});
+
 
 // ===== Start =====
 app.listen(PORT, () => {

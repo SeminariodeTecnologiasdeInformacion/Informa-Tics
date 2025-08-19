@@ -113,13 +113,6 @@ export class PrismaClient<
    */
   $disconnect(): $Utils.JsPromise<void>;
 
-  /**
-   * Add a middleware
-   * @deprecated since 4.16.0. For new code, prefer client extensions instead.
-   * @see https://pris.ly/d/extensions
-   */
-  $use(cb: Prisma.Middleware): void
-
 /**
    * Executes a prepared raw query and returns the number of affected rows.
    * @example
@@ -346,8 +339,8 @@ export namespace Prisma {
   export import Exact = $Public.Exact
 
   /**
-   * Prisma Client JS version: 6.13.0
-   * Query Engine version: 361e86d0ea4987e9f53a565309b3eed797a6bcbd
+   * Prisma Client JS version: 6.14.0
+   * Query Engine version: 717184b7b35ea05dfa71a3236b7af656013e1e49
    */
   export type PrismaVersion = {
     client: string
@@ -1660,25 +1653,6 @@ export namespace Prisma {
     | 'findRaw'
     | 'groupBy'
 
-  /**
-   * These options are being passed into the middleware as "params"
-   */
-  export type MiddlewareParams = {
-    model?: ModelName
-    action: PrismaAction
-    args: any
-    dataPath: string[]
-    runInTransaction: boolean
-  }
-
-  /**
-   * The `T` type makes sure, that the `return proceed` is not forgotten in the middleware implementation
-   */
-  export type Middleware<T = any> = (
-    params: MiddlewareParams,
-    next: (params: MiddlewareParams) => $Utils.JsPromise<T>,
-  ) => $Utils.JsPromise<T>
-
   // tested in getLogLevel.test.ts
   export function getLogLevel(log: Array<LogLevel | LogDefinition>): LogLevel | undefined;
 
@@ -1953,6 +1927,7 @@ export namespace Prisma {
     estado: boolean | null
     creadoEn: Date | null
     actualizadoEn: Date | null
+    debeCambiarPassword: boolean | null
     rolId: number | null
   }
 
@@ -1965,6 +1940,7 @@ export namespace Prisma {
     estado: boolean | null
     creadoEn: Date | null
     actualizadoEn: Date | null
+    debeCambiarPassword: boolean | null
     rolId: number | null
   }
 
@@ -1977,6 +1953,7 @@ export namespace Prisma {
     estado: number
     creadoEn: number
     actualizadoEn: number
+    debeCambiarPassword: number
     rolId: number
     _all: number
   }
@@ -2001,6 +1978,7 @@ export namespace Prisma {
     estado?: true
     creadoEn?: true
     actualizadoEn?: true
+    debeCambiarPassword?: true
     rolId?: true
   }
 
@@ -2013,6 +1991,7 @@ export namespace Prisma {
     estado?: true
     creadoEn?: true
     actualizadoEn?: true
+    debeCambiarPassword?: true
     rolId?: true
   }
 
@@ -2025,6 +2004,7 @@ export namespace Prisma {
     estado?: true
     creadoEn?: true
     actualizadoEn?: true
+    debeCambiarPassword?: true
     rolId?: true
     _all?: true
   }
@@ -2120,10 +2100,11 @@ export namespace Prisma {
     nombre: string
     usuario: string
     correo: string
-    contrasena: string
+    contrasena: string | null
     estado: boolean
     creadoEn: Date
     actualizadoEn: Date
+    debeCambiarPassword: boolean
     rolId: number
     _count: UsuarioCountAggregateOutputType | null
     _avg: UsuarioAvgAggregateOutputType | null
@@ -2155,6 +2136,7 @@ export namespace Prisma {
     estado?: boolean
     creadoEn?: boolean
     actualizadoEn?: boolean
+    debeCambiarPassword?: boolean
     rolId?: boolean
     rol?: boolean | RolDefaultArgs<ExtArgs>
     historialModificaciones?: boolean | Usuario$historialModificacionesArgs<ExtArgs>
@@ -2174,6 +2156,7 @@ export namespace Prisma {
     estado?: boolean
     creadoEn?: boolean
     actualizadoEn?: boolean
+    debeCambiarPassword?: boolean
     rolId?: boolean
     rol?: boolean | RolDefaultArgs<ExtArgs>
   }, ExtArgs["result"]["usuario"]>
@@ -2187,6 +2170,7 @@ export namespace Prisma {
     estado?: boolean
     creadoEn?: boolean
     actualizadoEn?: boolean
+    debeCambiarPassword?: boolean
     rolId?: boolean
     rol?: boolean | RolDefaultArgs<ExtArgs>
   }, ExtArgs["result"]["usuario"]>
@@ -2200,10 +2184,11 @@ export namespace Prisma {
     estado?: boolean
     creadoEn?: boolean
     actualizadoEn?: boolean
+    debeCambiarPassword?: boolean
     rolId?: boolean
   }
 
-  export type UsuarioOmit<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = $Extensions.GetOmit<"id" | "nombre" | "usuario" | "correo" | "contrasena" | "estado" | "creadoEn" | "actualizadoEn" | "rolId", ExtArgs["result"]["usuario"]>
+  export type UsuarioOmit<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = $Extensions.GetOmit<"id" | "nombre" | "usuario" | "correo" | "contrasena" | "estado" | "creadoEn" | "actualizadoEn" | "debeCambiarPassword" | "rolId", ExtArgs["result"]["usuario"]>
   export type UsuarioInclude<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
     rol?: boolean | RolDefaultArgs<ExtArgs>
     historialModificaciones?: boolean | Usuario$historialModificacionesArgs<ExtArgs>
@@ -2235,10 +2220,11 @@ export namespace Prisma {
       nombre: string
       usuario: string
       correo: string
-      contrasena: string
+      contrasena: string | null
       estado: boolean
       creadoEn: Date
       actualizadoEn: Date
+      debeCambiarPassword: boolean
       rolId: number
     }, ExtArgs["result"]["usuario"]>
     composites: {}
@@ -2677,6 +2663,7 @@ export namespace Prisma {
     readonly estado: FieldRef<"Usuario", 'Boolean'>
     readonly creadoEn: FieldRef<"Usuario", 'DateTime'>
     readonly actualizadoEn: FieldRef<"Usuario", 'DateTime'>
+    readonly debeCambiarPassword: FieldRef<"Usuario", 'Boolean'>
     readonly rolId: FieldRef<"Usuario", 'Int'>
   }
     
@@ -13422,6 +13409,7 @@ export namespace Prisma {
     estado: 'estado',
     creadoEn: 'creadoEn',
     actualizadoEn: 'actualizadoEn',
+    debeCambiarPassword: 'debeCambiarPassword',
     rolId: 'rolId'
   };
 
@@ -13637,10 +13625,11 @@ export namespace Prisma {
     nombre?: StringFilter<"Usuario"> | string
     usuario?: StringFilter<"Usuario"> | string
     correo?: StringFilter<"Usuario"> | string
-    contrasena?: StringFilter<"Usuario"> | string
+    contrasena?: StringNullableFilter<"Usuario"> | string | null
     estado?: BoolFilter<"Usuario"> | boolean
     creadoEn?: DateTimeFilter<"Usuario"> | Date | string
     actualizadoEn?: DateTimeFilter<"Usuario"> | Date | string
+    debeCambiarPassword?: BoolFilter<"Usuario"> | boolean
     rolId?: IntFilter<"Usuario"> | number
     rol?: XOR<RolScalarRelationFilter, RolWhereInput>
     historialModificaciones?: HistorialModificacionListRelationFilter
@@ -13655,10 +13644,11 @@ export namespace Prisma {
     nombre?: SortOrder
     usuario?: SortOrder
     correo?: SortOrder
-    contrasena?: SortOrder
+    contrasena?: SortOrderInput | SortOrder
     estado?: SortOrder
     creadoEn?: SortOrder
     actualizadoEn?: SortOrder
+    debeCambiarPassword?: SortOrder
     rolId?: SortOrder
     rol?: RolOrderByWithRelationInput
     historialModificaciones?: HistorialModificacionOrderByRelationAggregateInput
@@ -13676,10 +13666,11 @@ export namespace Prisma {
     OR?: UsuarioWhereInput[]
     NOT?: UsuarioWhereInput | UsuarioWhereInput[]
     nombre?: StringFilter<"Usuario"> | string
-    contrasena?: StringFilter<"Usuario"> | string
+    contrasena?: StringNullableFilter<"Usuario"> | string | null
     estado?: BoolFilter<"Usuario"> | boolean
     creadoEn?: DateTimeFilter<"Usuario"> | Date | string
     actualizadoEn?: DateTimeFilter<"Usuario"> | Date | string
+    debeCambiarPassword?: BoolFilter<"Usuario"> | boolean
     rolId?: IntFilter<"Usuario"> | number
     rol?: XOR<RolScalarRelationFilter, RolWhereInput>
     historialModificaciones?: HistorialModificacionListRelationFilter
@@ -13694,10 +13685,11 @@ export namespace Prisma {
     nombre?: SortOrder
     usuario?: SortOrder
     correo?: SortOrder
-    contrasena?: SortOrder
+    contrasena?: SortOrderInput | SortOrder
     estado?: SortOrder
     creadoEn?: SortOrder
     actualizadoEn?: SortOrder
+    debeCambiarPassword?: SortOrder
     rolId?: SortOrder
     _count?: UsuarioCountOrderByAggregateInput
     _avg?: UsuarioAvgOrderByAggregateInput
@@ -13714,10 +13706,11 @@ export namespace Prisma {
     nombre?: StringWithAggregatesFilter<"Usuario"> | string
     usuario?: StringWithAggregatesFilter<"Usuario"> | string
     correo?: StringWithAggregatesFilter<"Usuario"> | string
-    contrasena?: StringWithAggregatesFilter<"Usuario"> | string
+    contrasena?: StringNullableWithAggregatesFilter<"Usuario"> | string | null
     estado?: BoolWithAggregatesFilter<"Usuario"> | boolean
     creadoEn?: DateTimeWithAggregatesFilter<"Usuario"> | Date | string
     actualizadoEn?: DateTimeWithAggregatesFilter<"Usuario"> | Date | string
+    debeCambiarPassword?: BoolWithAggregatesFilter<"Usuario"> | boolean
     rolId?: IntWithAggregatesFilter<"Usuario"> | number
   }
 
@@ -14295,10 +14288,11 @@ export namespace Prisma {
     nombre: string
     usuario: string
     correo: string
-    contrasena: string
+    contrasena?: string | null
     estado?: boolean
     creadoEn?: Date | string
     actualizadoEn?: Date | string
+    debeCambiarPassword?: boolean
     rol: RolCreateNestedOneWithoutUsuariosInput
     historialModificaciones?: HistorialModificacionCreateNestedManyWithoutUsuarioInput
     historialResponsable?: HistorialModificacionCreateNestedManyWithoutResponsableInput
@@ -14312,10 +14306,11 @@ export namespace Prisma {
     nombre: string
     usuario: string
     correo: string
-    contrasena: string
+    contrasena?: string | null
     estado?: boolean
     creadoEn?: Date | string
     actualizadoEn?: Date | string
+    debeCambiarPassword?: boolean
     rolId: number
     historialModificaciones?: HistorialModificacionUncheckedCreateNestedManyWithoutUsuarioInput
     historialResponsable?: HistorialModificacionUncheckedCreateNestedManyWithoutResponsableInput
@@ -14328,10 +14323,11 @@ export namespace Prisma {
     nombre?: StringFieldUpdateOperationsInput | string
     usuario?: StringFieldUpdateOperationsInput | string
     correo?: StringFieldUpdateOperationsInput | string
-    contrasena?: StringFieldUpdateOperationsInput | string
+    contrasena?: NullableStringFieldUpdateOperationsInput | string | null
     estado?: BoolFieldUpdateOperationsInput | boolean
     creadoEn?: DateTimeFieldUpdateOperationsInput | Date | string
     actualizadoEn?: DateTimeFieldUpdateOperationsInput | Date | string
+    debeCambiarPassword?: BoolFieldUpdateOperationsInput | boolean
     rol?: RolUpdateOneRequiredWithoutUsuariosNestedInput
     historialModificaciones?: HistorialModificacionUpdateManyWithoutUsuarioNestedInput
     historialResponsable?: HistorialModificacionUpdateManyWithoutResponsableNestedInput
@@ -14345,10 +14341,11 @@ export namespace Prisma {
     nombre?: StringFieldUpdateOperationsInput | string
     usuario?: StringFieldUpdateOperationsInput | string
     correo?: StringFieldUpdateOperationsInput | string
-    contrasena?: StringFieldUpdateOperationsInput | string
+    contrasena?: NullableStringFieldUpdateOperationsInput | string | null
     estado?: BoolFieldUpdateOperationsInput | boolean
     creadoEn?: DateTimeFieldUpdateOperationsInput | Date | string
     actualizadoEn?: DateTimeFieldUpdateOperationsInput | Date | string
+    debeCambiarPassword?: BoolFieldUpdateOperationsInput | boolean
     rolId?: IntFieldUpdateOperationsInput | number
     historialModificaciones?: HistorialModificacionUncheckedUpdateManyWithoutUsuarioNestedInput
     historialResponsable?: HistorialModificacionUncheckedUpdateManyWithoutResponsableNestedInput
@@ -14362,10 +14359,11 @@ export namespace Prisma {
     nombre: string
     usuario: string
     correo: string
-    contrasena: string
+    contrasena?: string | null
     estado?: boolean
     creadoEn?: Date | string
     actualizadoEn?: Date | string
+    debeCambiarPassword?: boolean
     rolId: number
   }
 
@@ -14373,10 +14371,11 @@ export namespace Prisma {
     nombre?: StringFieldUpdateOperationsInput | string
     usuario?: StringFieldUpdateOperationsInput | string
     correo?: StringFieldUpdateOperationsInput | string
-    contrasena?: StringFieldUpdateOperationsInput | string
+    contrasena?: NullableStringFieldUpdateOperationsInput | string | null
     estado?: BoolFieldUpdateOperationsInput | boolean
     creadoEn?: DateTimeFieldUpdateOperationsInput | Date | string
     actualizadoEn?: DateTimeFieldUpdateOperationsInput | Date | string
+    debeCambiarPassword?: BoolFieldUpdateOperationsInput | boolean
   }
 
   export type UsuarioUncheckedUpdateManyInput = {
@@ -14384,10 +14383,11 @@ export namespace Prisma {
     nombre?: StringFieldUpdateOperationsInput | string
     usuario?: StringFieldUpdateOperationsInput | string
     correo?: StringFieldUpdateOperationsInput | string
-    contrasena?: StringFieldUpdateOperationsInput | string
+    contrasena?: NullableStringFieldUpdateOperationsInput | string | null
     estado?: BoolFieldUpdateOperationsInput | boolean
     creadoEn?: DateTimeFieldUpdateOperationsInput | Date | string
     actualizadoEn?: DateTimeFieldUpdateOperationsInput | Date | string
+    debeCambiarPassword?: BoolFieldUpdateOperationsInput | boolean
     rolId?: IntFieldUpdateOperationsInput | number
   }
 
@@ -14958,6 +14958,21 @@ export namespace Prisma {
     not?: NestedStringFilter<$PrismaModel> | string
   }
 
+  export type StringNullableFilter<$PrismaModel = never> = {
+    equals?: string | StringFieldRefInput<$PrismaModel> | null
+    in?: string[] | ListStringFieldRefInput<$PrismaModel> | null
+    notIn?: string[] | ListStringFieldRefInput<$PrismaModel> | null
+    lt?: string | StringFieldRefInput<$PrismaModel>
+    lte?: string | StringFieldRefInput<$PrismaModel>
+    gt?: string | StringFieldRefInput<$PrismaModel>
+    gte?: string | StringFieldRefInput<$PrismaModel>
+    contains?: string | StringFieldRefInput<$PrismaModel>
+    startsWith?: string | StringFieldRefInput<$PrismaModel>
+    endsWith?: string | StringFieldRefInput<$PrismaModel>
+    mode?: QueryMode
+    not?: NestedStringNullableFilter<$PrismaModel> | string | null
+  }
+
   export type BoolFilter<$PrismaModel = never> = {
     equals?: boolean | BooleanFieldRefInput<$PrismaModel>
     not?: NestedBoolFilter<$PrismaModel> | boolean
@@ -15002,6 +15017,11 @@ export namespace Prisma {
     isNot?: CocinaChefWhereInput | null
   }
 
+  export type SortOrderInput = {
+    sort: SortOrder
+    nulls?: NullsOrder
+  }
+
   export type HistorialModificacionOrderByRelationAggregateInput = {
     _count?: SortOrder
   }
@@ -15023,6 +15043,7 @@ export namespace Prisma {
     estado?: SortOrder
     creadoEn?: SortOrder
     actualizadoEn?: SortOrder
+    debeCambiarPassword?: SortOrder
     rolId?: SortOrder
   }
 
@@ -15040,6 +15061,7 @@ export namespace Prisma {
     estado?: SortOrder
     creadoEn?: SortOrder
     actualizadoEn?: SortOrder
+    debeCambiarPassword?: SortOrder
     rolId?: SortOrder
   }
 
@@ -15052,6 +15074,7 @@ export namespace Prisma {
     estado?: SortOrder
     creadoEn?: SortOrder
     actualizadoEn?: SortOrder
+    debeCambiarPassword?: SortOrder
     rolId?: SortOrder
   }
 
@@ -15092,6 +15115,24 @@ export namespace Prisma {
     _count?: NestedIntFilter<$PrismaModel>
     _min?: NestedStringFilter<$PrismaModel>
     _max?: NestedStringFilter<$PrismaModel>
+  }
+
+  export type StringNullableWithAggregatesFilter<$PrismaModel = never> = {
+    equals?: string | StringFieldRefInput<$PrismaModel> | null
+    in?: string[] | ListStringFieldRefInput<$PrismaModel> | null
+    notIn?: string[] | ListStringFieldRefInput<$PrismaModel> | null
+    lt?: string | StringFieldRefInput<$PrismaModel>
+    lte?: string | StringFieldRefInput<$PrismaModel>
+    gt?: string | StringFieldRefInput<$PrismaModel>
+    gte?: string | StringFieldRefInput<$PrismaModel>
+    contains?: string | StringFieldRefInput<$PrismaModel>
+    startsWith?: string | StringFieldRefInput<$PrismaModel>
+    endsWith?: string | StringFieldRefInput<$PrismaModel>
+    mode?: QueryMode
+    not?: NestedStringNullableWithAggregatesFilter<$PrismaModel> | string | null
+    _count?: NestedIntNullableFilter<$PrismaModel>
+    _min?: NestedStringNullableFilter<$PrismaModel>
+    _max?: NestedStringNullableFilter<$PrismaModel>
   }
 
   export type BoolWithAggregatesFilter<$PrismaModel = never> = {
@@ -15159,26 +15200,6 @@ export namespace Prisma {
     id?: SortOrder
   }
 
-  export type StringNullableFilter<$PrismaModel = never> = {
-    equals?: string | StringFieldRefInput<$PrismaModel> | null
-    in?: string[] | ListStringFieldRefInput<$PrismaModel> | null
-    notIn?: string[] | ListStringFieldRefInput<$PrismaModel> | null
-    lt?: string | StringFieldRefInput<$PrismaModel>
-    lte?: string | StringFieldRefInput<$PrismaModel>
-    gt?: string | StringFieldRefInput<$PrismaModel>
-    gte?: string | StringFieldRefInput<$PrismaModel>
-    contains?: string | StringFieldRefInput<$PrismaModel>
-    startsWith?: string | StringFieldRefInput<$PrismaModel>
-    endsWith?: string | StringFieldRefInput<$PrismaModel>
-    mode?: QueryMode
-    not?: NestedStringNullableFilter<$PrismaModel> | string | null
-  }
-
-  export type SortOrderInput = {
-    sort: SortOrder
-    nulls?: NullsOrder
-  }
-
   export type PermisoCountOrderByAggregateInput = {
     id?: SortOrder
     nombre?: SortOrder
@@ -15203,24 +15224,6 @@ export namespace Prisma {
 
   export type PermisoSumOrderByAggregateInput = {
     id?: SortOrder
-  }
-
-  export type StringNullableWithAggregatesFilter<$PrismaModel = never> = {
-    equals?: string | StringFieldRefInput<$PrismaModel> | null
-    in?: string[] | ListStringFieldRefInput<$PrismaModel> | null
-    notIn?: string[] | ListStringFieldRefInput<$PrismaModel> | null
-    lt?: string | StringFieldRefInput<$PrismaModel>
-    lte?: string | StringFieldRefInput<$PrismaModel>
-    gt?: string | StringFieldRefInput<$PrismaModel>
-    gte?: string | StringFieldRefInput<$PrismaModel>
-    contains?: string | StringFieldRefInput<$PrismaModel>
-    startsWith?: string | StringFieldRefInput<$PrismaModel>
-    endsWith?: string | StringFieldRefInput<$PrismaModel>
-    mode?: QueryMode
-    not?: NestedStringNullableWithAggregatesFilter<$PrismaModel> | string | null
-    _count?: NestedIntNullableFilter<$PrismaModel>
-    _min?: NestedStringNullableFilter<$PrismaModel>
-    _max?: NestedStringNullableFilter<$PrismaModel>
   }
 
   export type PermisoScalarRelationFilter = {
@@ -15715,6 +15718,10 @@ export namespace Prisma {
     set?: string
   }
 
+  export type NullableStringFieldUpdateOperationsInput = {
+    set?: string | null
+  }
+
   export type BoolFieldUpdateOperationsInput = {
     set?: boolean
   }
@@ -15967,10 +15974,6 @@ export namespace Prisma {
     connectOrCreate?: PermisoPorRolCreateOrConnectWithoutPermisoInput | PermisoPorRolCreateOrConnectWithoutPermisoInput[]
     createMany?: PermisoPorRolCreateManyPermisoInputEnvelope
     connect?: PermisoPorRolWhereUniqueInput | PermisoPorRolWhereUniqueInput[]
-  }
-
-  export type NullableStringFieldUpdateOperationsInput = {
-    set?: string | null
   }
 
   export type PermisoPorRolUpdateManyWithoutPermisoNestedInput = {
@@ -16318,6 +16321,20 @@ export namespace Prisma {
     not?: NestedStringFilter<$PrismaModel> | string
   }
 
+  export type NestedStringNullableFilter<$PrismaModel = never> = {
+    equals?: string | StringFieldRefInput<$PrismaModel> | null
+    in?: string[] | ListStringFieldRefInput<$PrismaModel> | null
+    notIn?: string[] | ListStringFieldRefInput<$PrismaModel> | null
+    lt?: string | StringFieldRefInput<$PrismaModel>
+    lte?: string | StringFieldRefInput<$PrismaModel>
+    gt?: string | StringFieldRefInput<$PrismaModel>
+    gte?: string | StringFieldRefInput<$PrismaModel>
+    contains?: string | StringFieldRefInput<$PrismaModel>
+    startsWith?: string | StringFieldRefInput<$PrismaModel>
+    endsWith?: string | StringFieldRefInput<$PrismaModel>
+    not?: NestedStringNullableFilter<$PrismaModel> | string | null
+  }
+
   export type NestedBoolFilter<$PrismaModel = never> = {
     equals?: boolean | BooleanFieldRefInput<$PrismaModel>
     not?: NestedBoolFilter<$PrismaModel> | boolean
@@ -16378,42 +16395,6 @@ export namespace Prisma {
     _max?: NestedStringFilter<$PrismaModel>
   }
 
-  export type NestedBoolWithAggregatesFilter<$PrismaModel = never> = {
-    equals?: boolean | BooleanFieldRefInput<$PrismaModel>
-    not?: NestedBoolWithAggregatesFilter<$PrismaModel> | boolean
-    _count?: NestedIntFilter<$PrismaModel>
-    _min?: NestedBoolFilter<$PrismaModel>
-    _max?: NestedBoolFilter<$PrismaModel>
-  }
-
-  export type NestedDateTimeWithAggregatesFilter<$PrismaModel = never> = {
-    equals?: Date | string | DateTimeFieldRefInput<$PrismaModel>
-    in?: Date[] | string[] | ListDateTimeFieldRefInput<$PrismaModel>
-    notIn?: Date[] | string[] | ListDateTimeFieldRefInput<$PrismaModel>
-    lt?: Date | string | DateTimeFieldRefInput<$PrismaModel>
-    lte?: Date | string | DateTimeFieldRefInput<$PrismaModel>
-    gt?: Date | string | DateTimeFieldRefInput<$PrismaModel>
-    gte?: Date | string | DateTimeFieldRefInput<$PrismaModel>
-    not?: NestedDateTimeWithAggregatesFilter<$PrismaModel> | Date | string
-    _count?: NestedIntFilter<$PrismaModel>
-    _min?: NestedDateTimeFilter<$PrismaModel>
-    _max?: NestedDateTimeFilter<$PrismaModel>
-  }
-
-  export type NestedStringNullableFilter<$PrismaModel = never> = {
-    equals?: string | StringFieldRefInput<$PrismaModel> | null
-    in?: string[] | ListStringFieldRefInput<$PrismaModel> | null
-    notIn?: string[] | ListStringFieldRefInput<$PrismaModel> | null
-    lt?: string | StringFieldRefInput<$PrismaModel>
-    lte?: string | StringFieldRefInput<$PrismaModel>
-    gt?: string | StringFieldRefInput<$PrismaModel>
-    gte?: string | StringFieldRefInput<$PrismaModel>
-    contains?: string | StringFieldRefInput<$PrismaModel>
-    startsWith?: string | StringFieldRefInput<$PrismaModel>
-    endsWith?: string | StringFieldRefInput<$PrismaModel>
-    not?: NestedStringNullableFilter<$PrismaModel> | string | null
-  }
-
   export type NestedStringNullableWithAggregatesFilter<$PrismaModel = never> = {
     equals?: string | StringFieldRefInput<$PrismaModel> | null
     in?: string[] | ListStringFieldRefInput<$PrismaModel> | null
@@ -16440,6 +16421,28 @@ export namespace Prisma {
     gt?: number | IntFieldRefInput<$PrismaModel>
     gte?: number | IntFieldRefInput<$PrismaModel>
     not?: NestedIntNullableFilter<$PrismaModel> | number | null
+  }
+
+  export type NestedBoolWithAggregatesFilter<$PrismaModel = never> = {
+    equals?: boolean | BooleanFieldRefInput<$PrismaModel>
+    not?: NestedBoolWithAggregatesFilter<$PrismaModel> | boolean
+    _count?: NestedIntFilter<$PrismaModel>
+    _min?: NestedBoolFilter<$PrismaModel>
+    _max?: NestedBoolFilter<$PrismaModel>
+  }
+
+  export type NestedDateTimeWithAggregatesFilter<$PrismaModel = never> = {
+    equals?: Date | string | DateTimeFieldRefInput<$PrismaModel>
+    in?: Date[] | string[] | ListDateTimeFieldRefInput<$PrismaModel>
+    notIn?: Date[] | string[] | ListDateTimeFieldRefInput<$PrismaModel>
+    lt?: Date | string | DateTimeFieldRefInput<$PrismaModel>
+    lte?: Date | string | DateTimeFieldRefInput<$PrismaModel>
+    gt?: Date | string | DateTimeFieldRefInput<$PrismaModel>
+    gte?: Date | string | DateTimeFieldRefInput<$PrismaModel>
+    not?: NestedDateTimeWithAggregatesFilter<$PrismaModel> | Date | string
+    _count?: NestedIntFilter<$PrismaModel>
+    _min?: NestedDateTimeFilter<$PrismaModel>
+    _max?: NestedDateTimeFilter<$PrismaModel>
   }
 
   export type NestedFloatWithAggregatesFilter<$PrismaModel = never> = {
@@ -16831,10 +16834,11 @@ export namespace Prisma {
     nombre: string
     usuario: string
     correo: string
-    contrasena: string
+    contrasena?: string | null
     estado?: boolean
     creadoEn?: Date | string
     actualizadoEn?: Date | string
+    debeCambiarPassword?: boolean
     historialModificaciones?: HistorialModificacionCreateNestedManyWithoutUsuarioInput
     historialResponsable?: HistorialModificacionCreateNestedManyWithoutResponsableInput
     ordenesMesero?: OrdenCreateNestedManyWithoutMeseroInput
@@ -16847,10 +16851,11 @@ export namespace Prisma {
     nombre: string
     usuario: string
     correo: string
-    contrasena: string
+    contrasena?: string | null
     estado?: boolean
     creadoEn?: Date | string
     actualizadoEn?: Date | string
+    debeCambiarPassword?: boolean
     historialModificaciones?: HistorialModificacionUncheckedCreateNestedManyWithoutUsuarioInput
     historialResponsable?: HistorialModificacionUncheckedCreateNestedManyWithoutResponsableInput
     ordenesMesero?: OrdenUncheckedCreateNestedManyWithoutMeseroInput
@@ -16911,10 +16916,11 @@ export namespace Prisma {
     nombre?: StringFilter<"Usuario"> | string
     usuario?: StringFilter<"Usuario"> | string
     correo?: StringFilter<"Usuario"> | string
-    contrasena?: StringFilter<"Usuario"> | string
+    contrasena?: StringNullableFilter<"Usuario"> | string | null
     estado?: BoolFilter<"Usuario"> | boolean
     creadoEn?: DateTimeFilter<"Usuario"> | Date | string
     actualizadoEn?: DateTimeFilter<"Usuario"> | Date | string
+    debeCambiarPassword?: BoolFilter<"Usuario"> | boolean
     rolId?: IntFilter<"Usuario"> | number
   }
 
@@ -17205,10 +17211,11 @@ export namespace Prisma {
     nombre: string
     usuario: string
     correo: string
-    contrasena: string
+    contrasena?: string | null
     estado?: boolean
     creadoEn?: Date | string
     actualizadoEn?: Date | string
+    debeCambiarPassword?: boolean
     rol: RolCreateNestedOneWithoutUsuariosInput
     historialModificaciones?: HistorialModificacionCreateNestedManyWithoutUsuarioInput
     ordenesMesero?: OrdenCreateNestedManyWithoutMeseroInput
@@ -17221,10 +17228,11 @@ export namespace Prisma {
     nombre: string
     usuario: string
     correo: string
-    contrasena: string
+    contrasena?: string | null
     estado?: boolean
     creadoEn?: Date | string
     actualizadoEn?: Date | string
+    debeCambiarPassword?: boolean
     rolId: number
     historialModificaciones?: HistorialModificacionUncheckedCreateNestedManyWithoutUsuarioInput
     ordenesMesero?: OrdenUncheckedCreateNestedManyWithoutMeseroInput
@@ -17241,10 +17249,11 @@ export namespace Prisma {
     nombre: string
     usuario: string
     correo: string
-    contrasena: string
+    contrasena?: string | null
     estado?: boolean
     creadoEn?: Date | string
     actualizadoEn?: Date | string
+    debeCambiarPassword?: boolean
     rol: RolCreateNestedOneWithoutUsuariosInput
     historialResponsable?: HistorialModificacionCreateNestedManyWithoutResponsableInput
     ordenesMesero?: OrdenCreateNestedManyWithoutMeseroInput
@@ -17257,10 +17266,11 @@ export namespace Prisma {
     nombre: string
     usuario: string
     correo: string
-    contrasena: string
+    contrasena?: string | null
     estado?: boolean
     creadoEn?: Date | string
     actualizadoEn?: Date | string
+    debeCambiarPassword?: boolean
     rolId: number
     historialResponsable?: HistorialModificacionUncheckedCreateNestedManyWithoutResponsableInput
     ordenesMesero?: OrdenUncheckedCreateNestedManyWithoutMeseroInput
@@ -17312,10 +17322,11 @@ export namespace Prisma {
     nombre?: StringFieldUpdateOperationsInput | string
     usuario?: StringFieldUpdateOperationsInput | string
     correo?: StringFieldUpdateOperationsInput | string
-    contrasena?: StringFieldUpdateOperationsInput | string
+    contrasena?: NullableStringFieldUpdateOperationsInput | string | null
     estado?: BoolFieldUpdateOperationsInput | boolean
     creadoEn?: DateTimeFieldUpdateOperationsInput | Date | string
     actualizadoEn?: DateTimeFieldUpdateOperationsInput | Date | string
+    debeCambiarPassword?: BoolFieldUpdateOperationsInput | boolean
     rol?: RolUpdateOneRequiredWithoutUsuariosNestedInput
     historialModificaciones?: HistorialModificacionUpdateManyWithoutUsuarioNestedInput
     ordenesMesero?: OrdenUpdateManyWithoutMeseroNestedInput
@@ -17328,10 +17339,11 @@ export namespace Prisma {
     nombre?: StringFieldUpdateOperationsInput | string
     usuario?: StringFieldUpdateOperationsInput | string
     correo?: StringFieldUpdateOperationsInput | string
-    contrasena?: StringFieldUpdateOperationsInput | string
+    contrasena?: NullableStringFieldUpdateOperationsInput | string | null
     estado?: BoolFieldUpdateOperationsInput | boolean
     creadoEn?: DateTimeFieldUpdateOperationsInput | Date | string
     actualizadoEn?: DateTimeFieldUpdateOperationsInput | Date | string
+    debeCambiarPassword?: BoolFieldUpdateOperationsInput | boolean
     rolId?: IntFieldUpdateOperationsInput | number
     historialModificaciones?: HistorialModificacionUncheckedUpdateManyWithoutUsuarioNestedInput
     ordenesMesero?: OrdenUncheckedUpdateManyWithoutMeseroNestedInput
@@ -17354,10 +17366,11 @@ export namespace Prisma {
     nombre?: StringFieldUpdateOperationsInput | string
     usuario?: StringFieldUpdateOperationsInput | string
     correo?: StringFieldUpdateOperationsInput | string
-    contrasena?: StringFieldUpdateOperationsInput | string
+    contrasena?: NullableStringFieldUpdateOperationsInput | string | null
     estado?: BoolFieldUpdateOperationsInput | boolean
     creadoEn?: DateTimeFieldUpdateOperationsInput | Date | string
     actualizadoEn?: DateTimeFieldUpdateOperationsInput | Date | string
+    debeCambiarPassword?: BoolFieldUpdateOperationsInput | boolean
     rol?: RolUpdateOneRequiredWithoutUsuariosNestedInput
     historialResponsable?: HistorialModificacionUpdateManyWithoutResponsableNestedInput
     ordenesMesero?: OrdenUpdateManyWithoutMeseroNestedInput
@@ -17370,10 +17383,11 @@ export namespace Prisma {
     nombre?: StringFieldUpdateOperationsInput | string
     usuario?: StringFieldUpdateOperationsInput | string
     correo?: StringFieldUpdateOperationsInput | string
-    contrasena?: StringFieldUpdateOperationsInput | string
+    contrasena?: NullableStringFieldUpdateOperationsInput | string | null
     estado?: BoolFieldUpdateOperationsInput | boolean
     creadoEn?: DateTimeFieldUpdateOperationsInput | Date | string
     actualizadoEn?: DateTimeFieldUpdateOperationsInput | Date | string
+    debeCambiarPassword?: BoolFieldUpdateOperationsInput | boolean
     rolId?: IntFieldUpdateOperationsInput | number
     historialResponsable?: HistorialModificacionUncheckedUpdateManyWithoutResponsableNestedInput
     ordenesMesero?: OrdenUncheckedUpdateManyWithoutMeseroNestedInput
@@ -17415,10 +17429,11 @@ export namespace Prisma {
     nombre: string
     usuario: string
     correo: string
-    contrasena: string
+    contrasena?: string | null
     estado?: boolean
     creadoEn?: Date | string
     actualizadoEn?: Date | string
+    debeCambiarPassword?: boolean
     rol: RolCreateNestedOneWithoutUsuariosInput
     historialModificaciones?: HistorialModificacionCreateNestedManyWithoutUsuarioInput
     historialResponsable?: HistorialModificacionCreateNestedManyWithoutResponsableInput
@@ -17431,10 +17446,11 @@ export namespace Prisma {
     nombre: string
     usuario: string
     correo: string
-    contrasena: string
+    contrasena?: string | null
     estado?: boolean
     creadoEn?: Date | string
     actualizadoEn?: Date | string
+    debeCambiarPassword?: boolean
     rolId: number
     historialModificaciones?: HistorialModificacionUncheckedCreateNestedManyWithoutUsuarioInput
     historialResponsable?: HistorialModificacionUncheckedCreateNestedManyWithoutResponsableInput
@@ -17499,10 +17515,11 @@ export namespace Prisma {
     nombre?: StringFieldUpdateOperationsInput | string
     usuario?: StringFieldUpdateOperationsInput | string
     correo?: StringFieldUpdateOperationsInput | string
-    contrasena?: StringFieldUpdateOperationsInput | string
+    contrasena?: NullableStringFieldUpdateOperationsInput | string | null
     estado?: BoolFieldUpdateOperationsInput | boolean
     creadoEn?: DateTimeFieldUpdateOperationsInput | Date | string
     actualizadoEn?: DateTimeFieldUpdateOperationsInput | Date | string
+    debeCambiarPassword?: BoolFieldUpdateOperationsInput | boolean
     rol?: RolUpdateOneRequiredWithoutUsuariosNestedInput
     historialModificaciones?: HistorialModificacionUpdateManyWithoutUsuarioNestedInput
     historialResponsable?: HistorialModificacionUpdateManyWithoutResponsableNestedInput
@@ -17515,10 +17532,11 @@ export namespace Prisma {
     nombre?: StringFieldUpdateOperationsInput | string
     usuario?: StringFieldUpdateOperationsInput | string
     correo?: StringFieldUpdateOperationsInput | string
-    contrasena?: StringFieldUpdateOperationsInput | string
+    contrasena?: NullableStringFieldUpdateOperationsInput | string | null
     estado?: BoolFieldUpdateOperationsInput | boolean
     creadoEn?: DateTimeFieldUpdateOperationsInput | Date | string
     actualizadoEn?: DateTimeFieldUpdateOperationsInput | Date | string
+    debeCambiarPassword?: BoolFieldUpdateOperationsInput | boolean
     rolId?: IntFieldUpdateOperationsInput | number
     historialModificaciones?: HistorialModificacionUncheckedUpdateManyWithoutUsuarioNestedInput
     historialResponsable?: HistorialModificacionUncheckedUpdateManyWithoutResponsableNestedInput
@@ -17572,10 +17590,11 @@ export namespace Prisma {
     nombre: string
     usuario: string
     correo: string
-    contrasena: string
+    contrasena?: string | null
     estado?: boolean
     creadoEn?: Date | string
     actualizadoEn?: Date | string
+    debeCambiarPassword?: boolean
     rol: RolCreateNestedOneWithoutUsuariosInput
     historialModificaciones?: HistorialModificacionCreateNestedManyWithoutUsuarioInput
     historialResponsable?: HistorialModificacionCreateNestedManyWithoutResponsableInput
@@ -17588,10 +17607,11 @@ export namespace Prisma {
     nombre: string
     usuario: string
     correo: string
-    contrasena: string
+    contrasena?: string | null
     estado?: boolean
     creadoEn?: Date | string
     actualizadoEn?: Date | string
+    debeCambiarPassword?: boolean
     rolId: number
     historialModificaciones?: HistorialModificacionUncheckedCreateNestedManyWithoutUsuarioInput
     historialResponsable?: HistorialModificacionUncheckedCreateNestedManyWithoutResponsableInput
@@ -17651,10 +17671,11 @@ export namespace Prisma {
     nombre?: StringFieldUpdateOperationsInput | string
     usuario?: StringFieldUpdateOperationsInput | string
     correo?: StringFieldUpdateOperationsInput | string
-    contrasena?: StringFieldUpdateOperationsInput | string
+    contrasena?: NullableStringFieldUpdateOperationsInput | string | null
     estado?: BoolFieldUpdateOperationsInput | boolean
     creadoEn?: DateTimeFieldUpdateOperationsInput | Date | string
     actualizadoEn?: DateTimeFieldUpdateOperationsInput | Date | string
+    debeCambiarPassword?: BoolFieldUpdateOperationsInput | boolean
     rol?: RolUpdateOneRequiredWithoutUsuariosNestedInput
     historialModificaciones?: HistorialModificacionUpdateManyWithoutUsuarioNestedInput
     historialResponsable?: HistorialModificacionUpdateManyWithoutResponsableNestedInput
@@ -17667,10 +17688,11 @@ export namespace Prisma {
     nombre?: StringFieldUpdateOperationsInput | string
     usuario?: StringFieldUpdateOperationsInput | string
     correo?: StringFieldUpdateOperationsInput | string
-    contrasena?: StringFieldUpdateOperationsInput | string
+    contrasena?: NullableStringFieldUpdateOperationsInput | string | null
     estado?: BoolFieldUpdateOperationsInput | boolean
     creadoEn?: DateTimeFieldUpdateOperationsInput | Date | string
     actualizadoEn?: DateTimeFieldUpdateOperationsInput | Date | string
+    debeCambiarPassword?: BoolFieldUpdateOperationsInput | boolean
     rolId?: IntFieldUpdateOperationsInput | number
     historialModificaciones?: HistorialModificacionUncheckedUpdateManyWithoutUsuarioNestedInput
     historialResponsable?: HistorialModificacionUncheckedUpdateManyWithoutResponsableNestedInput
@@ -17682,10 +17704,11 @@ export namespace Prisma {
     nombre: string
     usuario: string
     correo: string
-    contrasena: string
+    contrasena?: string | null
     estado?: boolean
     creadoEn?: Date | string
     actualizadoEn?: Date | string
+    debeCambiarPassword?: boolean
     rol: RolCreateNestedOneWithoutUsuariosInput
     historialModificaciones?: HistorialModificacionCreateNestedManyWithoutUsuarioInput
     historialResponsable?: HistorialModificacionCreateNestedManyWithoutResponsableInput
@@ -17698,10 +17721,11 @@ export namespace Prisma {
     nombre: string
     usuario: string
     correo: string
-    contrasena: string
+    contrasena?: string | null
     estado?: boolean
     creadoEn?: Date | string
     actualizadoEn?: Date | string
+    debeCambiarPassword?: boolean
     rolId: number
     historialModificaciones?: HistorialModificacionUncheckedCreateNestedManyWithoutUsuarioInput
     historialResponsable?: HistorialModificacionUncheckedCreateNestedManyWithoutResponsableInput
@@ -17729,10 +17753,11 @@ export namespace Prisma {
     nombre?: StringFieldUpdateOperationsInput | string
     usuario?: StringFieldUpdateOperationsInput | string
     correo?: StringFieldUpdateOperationsInput | string
-    contrasena?: StringFieldUpdateOperationsInput | string
+    contrasena?: NullableStringFieldUpdateOperationsInput | string | null
     estado?: BoolFieldUpdateOperationsInput | boolean
     creadoEn?: DateTimeFieldUpdateOperationsInput | Date | string
     actualizadoEn?: DateTimeFieldUpdateOperationsInput | Date | string
+    debeCambiarPassword?: BoolFieldUpdateOperationsInput | boolean
     rol?: RolUpdateOneRequiredWithoutUsuariosNestedInput
     historialModificaciones?: HistorialModificacionUpdateManyWithoutUsuarioNestedInput
     historialResponsable?: HistorialModificacionUpdateManyWithoutResponsableNestedInput
@@ -17745,10 +17770,11 @@ export namespace Prisma {
     nombre?: StringFieldUpdateOperationsInput | string
     usuario?: StringFieldUpdateOperationsInput | string
     correo?: StringFieldUpdateOperationsInput | string
-    contrasena?: StringFieldUpdateOperationsInput | string
+    contrasena?: NullableStringFieldUpdateOperationsInput | string | null
     estado?: BoolFieldUpdateOperationsInput | boolean
     creadoEn?: DateTimeFieldUpdateOperationsInput | Date | string
     actualizadoEn?: DateTimeFieldUpdateOperationsInput | Date | string
+    debeCambiarPassword?: BoolFieldUpdateOperationsInput | boolean
     rolId?: IntFieldUpdateOperationsInput | number
     historialModificaciones?: HistorialModificacionUncheckedUpdateManyWithoutUsuarioNestedInput
     historialResponsable?: HistorialModificacionUncheckedUpdateManyWithoutResponsableNestedInput
@@ -17943,10 +17969,11 @@ export namespace Prisma {
     nombre: string
     usuario: string
     correo: string
-    contrasena: string
+    contrasena?: string | null
     estado?: boolean
     creadoEn?: Date | string
     actualizadoEn?: Date | string
+    debeCambiarPassword?: boolean
   }
 
   export type PermisoPorRolCreateManyRolInput = {
@@ -17958,10 +17985,11 @@ export namespace Prisma {
     nombre?: StringFieldUpdateOperationsInput | string
     usuario?: StringFieldUpdateOperationsInput | string
     correo?: StringFieldUpdateOperationsInput | string
-    contrasena?: StringFieldUpdateOperationsInput | string
+    contrasena?: NullableStringFieldUpdateOperationsInput | string | null
     estado?: BoolFieldUpdateOperationsInput | boolean
     creadoEn?: DateTimeFieldUpdateOperationsInput | Date | string
     actualizadoEn?: DateTimeFieldUpdateOperationsInput | Date | string
+    debeCambiarPassword?: BoolFieldUpdateOperationsInput | boolean
     historialModificaciones?: HistorialModificacionUpdateManyWithoutUsuarioNestedInput
     historialResponsable?: HistorialModificacionUpdateManyWithoutResponsableNestedInput
     ordenesMesero?: OrdenUpdateManyWithoutMeseroNestedInput
@@ -17974,10 +18002,11 @@ export namespace Prisma {
     nombre?: StringFieldUpdateOperationsInput | string
     usuario?: StringFieldUpdateOperationsInput | string
     correo?: StringFieldUpdateOperationsInput | string
-    contrasena?: StringFieldUpdateOperationsInput | string
+    contrasena?: NullableStringFieldUpdateOperationsInput | string | null
     estado?: BoolFieldUpdateOperationsInput | boolean
     creadoEn?: DateTimeFieldUpdateOperationsInput | Date | string
     actualizadoEn?: DateTimeFieldUpdateOperationsInput | Date | string
+    debeCambiarPassword?: BoolFieldUpdateOperationsInput | boolean
     historialModificaciones?: HistorialModificacionUncheckedUpdateManyWithoutUsuarioNestedInput
     historialResponsable?: HistorialModificacionUncheckedUpdateManyWithoutResponsableNestedInput
     ordenesMesero?: OrdenUncheckedUpdateManyWithoutMeseroNestedInput
@@ -17990,10 +18019,11 @@ export namespace Prisma {
     nombre?: StringFieldUpdateOperationsInput | string
     usuario?: StringFieldUpdateOperationsInput | string
     correo?: StringFieldUpdateOperationsInput | string
-    contrasena?: StringFieldUpdateOperationsInput | string
+    contrasena?: NullableStringFieldUpdateOperationsInput | string | null
     estado?: BoolFieldUpdateOperationsInput | boolean
     creadoEn?: DateTimeFieldUpdateOperationsInput | Date | string
     actualizadoEn?: DateTimeFieldUpdateOperationsInput | Date | string
+    debeCambiarPassword?: BoolFieldUpdateOperationsInput | boolean
   }
 
   export type PermisoPorRolUpdateWithoutRolInput = {

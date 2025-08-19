@@ -14,6 +14,124 @@ import { ref as storageRef, getDownloadURL, uploadBytesResumable } from 'firebas
 
 const API = 'http://localhost:3001';
 
+/* =========================================================
+   Utilidades para comprimir/redimensionar imágenes en el navegador
+   Ahora: TODAS SALEN AL MISMO TAMAÑO (lienzo fijo con padding)
+   ========================================================= */
+const TARGET_W = 800;                 // Ancho fijo del lienzo de salida
+const TARGET_H = 800;                 // Alto fijo del lienzo de salida
+const OUTPUT_TYPE = 'image/webp';     // Formato destino
+const OUTPUT_QUALITY = 0.8;           // 0..1
+const FILL_COLOR = 'white';           // Color de fondo (para padding). Usa 'transparent' si prefieres
+
+function bytesFmt(n) {
+  if (n < 1024) return `${n} B`;
+  if (n < 1024 * 1024) return `${(n / 1024).toFixed(1)} KB`;
+  return `${(n / 1024 / 1024).toFixed(2)} MB`;
+}
+
+function fileToDataURL(file) {
+  return new Promise((resolve, reject) => {
+    const fr = new FileReader();
+    fr.onload = () => resolve(fr.result);
+    fr.onerror = reject;
+    fr.readAsDataURL(file);
+  });
+}
+
+async function loadImageBitmapOrElement(file) {
+  // Intentar createImageBitmap (rápido en navegadores modernos)
+  try {
+    if ('createImageBitmap' in window) {
+      return await createImageBitmap(file);
+    }
+  } catch {
+    // fallback abajo
+  }
+  // Fallback: cargar a <img> desde data URL
+  const dataURL = await fileToDataURL(file);
+  return await new Promise((resolve, reject) => {
+    const img = new Image();
+    img.onload = () => resolve(img);
+    img.onerror = reject;
+    img.src = dataURL;
+  });
+}
+
+async function canvasToBlob(canvas, type, quality) {
+  return await new Promise((resolve) => {
+    if (canvas.toBlob) {
+      canvas.toBlob((b) => resolve(b), type, quality);
+    } else {
+      // Fallback super compatible
+      const dataUrl = canvas.toDataURL(type, quality);
+      fetch(dataUrl).then((r) => r.blob()).then(resolve);
+    }
+  });
+}
+
+/**
+ * Comprime la imagen a un lienzo de tamaño fijo (TARGET_W × TARGET_H)
+ * manteniendo la proporción (encaja dentro) y rellenando el resto con FILL_COLOR.
+ * Devuelve un File .webp más liviano y de DIMENSIONES UNIFORMES.
+ */
+async function compressImage(
+  file,
+  {
+    targetW = TARGET_W,
+    targetH = TARGET_H,
+    type = OUTPUT_TYPE,
+    quality = OUTPUT_QUALITY,
+    fillColor = FILL_COLOR,
+  } = {}
+) {
+  const img = await loadImageBitmapOrElement(file);
+  const width = img.width || img.videoWidth || img.naturalWidth; // (por compat)
+  const height = img.height || img.videoHeight || img.naturalHeight;
+
+  // Calcular escala para encajar dentro del lienzo fijo
+  const scale = Math.min(targetW / width, targetH / height);
+  const outW = Math.max(1, Math.round(width * scale));
+  const outH = Math.max(1, Math.round(height * scale));
+
+  // Lienzo final fijo
+  const canvas = document.createElement('canvas');
+  canvas.width = targetW;
+  canvas.height = targetH;
+  const ctx = canvas.getContext('2d');
+
+  // Fondo (blanco por defecto). Si quieres transparente en PNG/WEBP con alpha, usa fillColor='transparent'
+  if (fillColor && fillColor !== 'transparent') {
+    ctx.fillStyle = fillColor;
+    ctx.fillRect(0, 0, targetW, targetH);
+  } else {
+    // Si no pintas nada, el lienzo queda transparente por defecto (para webp/png)
+    ctx.clearRect(0, 0, targetW, targetH);
+  }
+
+  // Centrar la imagen escalada
+  const offsetX = Math.floor((targetW - outW) / 2);
+  const offsetY = Math.floor((targetH - outH) / 2);
+
+  ctx.drawImage(img, offsetX, offsetY, outW, outH);
+
+  const blob = await canvasToBlob(canvas, type, quality);
+  // Si por alguna razón el resultado es más grande, devolvemos el original
+  const bestBlob = blob && blob.size < file.size ? blob : file;
+
+  // Asegurar extensión acorde al tipo destino
+  const baseName = file.name.replace(/\.[^.]+$/, '');
+  const ext =
+    bestBlob.type === 'image/webp'
+      ? 'webp'
+      : bestBlob.type?.split('/')[1] || 'jpg';
+  const outName = `${baseName}.${ext}`;
+
+  return new File([bestBlob], outName, { type: bestBlob.type });
+}
+
+/* ========================================================= */
+
 function Platillos() {
   const [platillos, setPlatillos] = useState([]);
   const [categorias, setCategorias] = useState([]);
@@ -137,7 +255,6 @@ function Platillos() {
         ? `¿Deseas desactivar "${platillo.nombre}"? No aparecerá en el menú.`
         : `¿Deseas activar "${platillo.nombre}"?`,
       confirmText: seraInactivar ? 'Desactivar' : 'Activar',
-      // <- ahora rojo como categorías
       confirmVariant: seraInactivar ? 'danger' : 'primary',
       onConfirm: async () => {
         try {
@@ -167,6 +284,8 @@ function Platillos() {
     e.target.value = '';
     if (!file) return;
 
+    // Nota: SVG se rasteriza correctamente en la mayoría de navegadores cuando se pone en <img>.
+    // Si llegas a tener problemas con SVG externos/CORS, considera excluir 'image/svg+xml'.
     const tiposPermitidos = ['image/jpeg', 'image/png', 'image/webp', 'image/gif', 'image/svg+xml'];
     if (!tiposPermitidos.includes(file.type)) {
       showToast(`Formato no permitido (${file.type}). Usa JPG, PNG, WEBP, GIF o SVG.`, 'danger');
@@ -183,11 +302,22 @@ function Platillos() {
       setSubiendoId(platilloId);
       setProgreso(0);
 
-      const nombreSeguro = file.name.replace(/\s+/g, '_');
+      // 1) Comprimir/redimensionar a tamaño UNIFORME (800x800 por defecto)
+      const originalBytes = file.size;
+      const optimized = await compressImage(file); // -> File .webp con 800×800 por defecto
+      const optimizedBytes = optimized.size;
+
+      // 2) Preparar nombre y metadata
+      const nombreSeguro = optimized.name.replace(/\s+/g, '_');
       const nombreArchivo = `platillos/${platilloId}-${Date.now()}-${nombreSeguro}`;
       const refObj = storageRef(storage, nombreArchivo);
+      const metadata = {
+        contentType: optimized.type,
+        // cacheControl: 'public,max-age=31536000,immutable', // opcional
+      };
 
-      const task = uploadBytesResumable(refObj, file);
+      // 3) Subir a Firebase Storage (archivo optimizado)
+      const task = uploadBytesResumable(refObj, optimized, metadata);
       task.on(
         'state_changed',
         (snap) => setProgreso((snap.bytesTransferred / snap.totalBytes) * 100),
@@ -204,7 +334,8 @@ function Platillos() {
               responsableId: responsableId || 1
             });
             await obtenerPlatillos();
-            showToast('Imagen subida y guardada.', 'success');
+            const ahorro = originalBytes > 0 ? ` (de ${bytesFmt(originalBytes)} a ${bytesFmt(optimizedBytes)})` : '';
+            showToast(`Imagen cambiada correctamente${ahorro}.`, 'success');
           } catch (e2) {
             console.error('Error guardando en backend:', e2);
             showToast(e2.response?.data?.error || 'Error al guardar imagen en la base de datos.', 'danger');
@@ -408,6 +539,8 @@ function Platillos() {
                             <img
                               src={platillo.imagenUrl}
                               alt={platillo.nombre}
+                              loading="lazy"
+                              decoding="async"
                               style={{ width: 52, height: 52, objectFit: 'cover', borderRadius: 10, border: '1px solid #e5e7eb' }}
                             />
                           ) : (
@@ -449,7 +582,6 @@ function Platillos() {
                           <button onClick={() => pedirConfirmacionDisponibilidad(platillo)} style={btn('#6b21a8')}>
                             {platillo.disponible ? 'Desactivar' : 'Activar'}
                           </button>
-                          {/* Botón Eliminar removido */}
                         </div>
                       </div>
                     );
@@ -468,12 +600,12 @@ function Platillos() {
         onClose={() => setToast(prev => ({ ...prev, show: false }))}
       />
 
-      {/* Modal de confirmación (igual que categorías → rojo) */}
+      {/* Modal de confirmación */}
       {confirmData && (
         <div className="modal fade" tabIndex="-1" ref={modalRef}>
           <div className="modal-dialog mt-5">
-            <div className="modal-content border-danger">
-              <div className="modal-header bg-danger text-white">
+            <div className={`modal-content border-${confirmData.confirmVariant === 'primary' ? 'primary' : 'danger'}`}>
+              <div className={`modal-header text-white ${confirmData.confirmVariant === 'primary' ? 'bg-primary' : 'bg-danger'}`}>
                 <h5 className="modal-title">{confirmData.title}</h5>
                 <button type="button" className="btn-close btn-close-white" onClick={closeModal}></button>
               </div>

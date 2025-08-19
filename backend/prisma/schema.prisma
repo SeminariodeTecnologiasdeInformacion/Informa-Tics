@@ -13,14 +13,17 @@ datasource db {
    ========================= */
 
 model Usuario {
-  id            Int      @id @default(autoincrement())
+  id            Int       @id @default(autoincrement())
   nombre        String
-  usuario       String   @unique
-  correo        String   @unique
-  contrasena    String
-  estado        Boolean  @default(true)
-  creadoEn      DateTime @default(now())
-  actualizadoEn DateTime @updatedAt
+  usuario       String    @unique
+  correo        String    @unique
+  contrasena    String?   // HASH (opcional mientras no haya sido definida)
+  estado        Boolean   @default(true)
+  creadoEn      DateTime  @default(now())
+  actualizadoEn DateTime  @updatedAt
+
+  // obliga a cambiar la contraseña cuando es temporal
+  debeCambiarPassword Boolean @default(false)
 
   rolId Int
   rol   Rol @relation(fields: [rolId], references: [id])
@@ -120,10 +123,10 @@ model Orden {
   // Código alfanumérico de 5 caracteres generado por la BD (ej: A1F3B)
   codigo String @unique @default(dbgenerated("upper(substr(md5(random()::text),1,5))")) @db.VarChar(5)
 
-  mesa       Int
-  fecha      DateTime @default(now())  // creación de la orden
-  finishedAt DateTime?                 // CUÁNDO terminó toda la orden
-  durationSec Int?                     // DURACIÓN total en segundos (finishedAt - fecha)
+  mesa        Int
+  fecha       DateTime @default(now())  // creación de la orden
+  finishedAt  DateTime?                 // CUÁNDO terminó toda la orden
+  durationSec Int?                      // DURACIÓN total en segundos (finishedAt - fecha)
 
   meseroId Int
   mesero   Usuario @relation("OrdenesDelMesero", fields: [meseroId], references: [id])
@@ -161,19 +164,6 @@ model OrdenItem {
   @@index([chefId, estado])
   @@index([ordenId, tipo, estado])
 }
-
-/* (Opcional) si deseas migrar a enums nativos más adelante:
-enum OrdenItemTipo {
-  PLATILLO
-  BEBIDA
-}
-enum OrdenItemEstado {
-  PENDIENTE
-  ASIGNADO
-  PREPARANDO
-  LISTO
-}
-*/
 
 /* =========================
    COCINA (estado de chefs)
